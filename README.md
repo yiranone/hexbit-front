@@ -115,11 +115,11 @@ npm run deploy
 release/aethercpu-deploy.tar.gz
 ```
 
-此包包含生产构建产物和 Sites 部署配置。当前命令只完成本地自动打包；接入 Cloudflare、Docker、服务器 SSH 或 CI/CD 后，可在同一流程的最后一步加入实际发布。
+此包只包含静态前端资源：`index.html`、CSS、JavaScript 和图片，可直接部署到 Nginx。
 
 ## GitHub 自动部署
 
-推送到 `main` 后，GitHub Actions 会自动安装依赖、构建 `dist`、压缩并通过 SSH 部署到服务器。首次启用前，在仓库的 **Settings → Secrets and variables → Actions** 配置：
+推送到 `main` 后，GitHub Actions 会自动安装依赖、构建静态 `dist`、压缩并通过 SSH 部署到服务器。首次启用前，在仓库的 **Settings → Secrets and variables → Actions** 配置：
 
 | 类型 | 名称 | 内容 |
 | --- | --- | --- |
@@ -130,3 +130,11 @@ release/aethercpu-deploy.tar.gz
 | Secret | `DEPLOY_SSH_PRIVATE_KEY` | 对应用户的私钥全文 |
 
 部署工作流先在服务器临时目录解压并校验，再切换到目标目录；旧版本只会在新版本就绪后删除。
+
+Nginx 的站点根目录直接指向 `DEPLOY_TARGET_DIR`；单页应用需要回退到 `index.html`：
+
+```nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```

@@ -68,7 +68,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Package deployment archive
+      - name: Package static-site archive
         id: archive
         run: |
           set -euo pipefail

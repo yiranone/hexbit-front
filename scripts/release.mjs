@@ -20,7 +20,6 @@ execFileSync(
     "-czf",
     output,
     "dist",
-    ".openai/hosting.json",
     "package.json",
     "package-lock.json",
     "README.md",
