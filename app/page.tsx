@@ -34,14 +34,15 @@ const statusItems = [
 
 export default function Home() {
   const [view, setView] = useState<"market" | "console">("market");
-  const [region, setRegion] = useState("全部区域");
+  const [locale, setLocale] = useState<"zh" | "en">("zh");
+  const [region, setRegion] = useState("all");
   const [selected, setSelected] = useState<Machine | null>(null);
   const [hours, setHours] = useState(24);
   const [paid, setPaid] = useState(false);
   const [notice, setNotice] = useState("");
 
   const inventory = useMemo(
-    () => machines.filter((m) => region === "全部区域" || m.region === region),
+    () => machines.filter((m) => region === "all" || m.region === region),
     [region],
   );
   const total = selected ? (selected.price * hours).toFixed(2) : "0.00";
@@ -51,46 +52,62 @@ export default function Home() {
     setPaid(false);
     setHours(24);
   };
+  const en = locale === "en";
+  const copy = en
+    ? {
+        market: "Marketplace", console: "Console", docs: "Docs", balance: "Wallet", loggedIn: "Signed in as chen@aethercpu.dev",
+        hero: <>Compute power that<br /><em>keeps you moving.</em></>, heroText: "Bare-metal-grade performance for development, automation, and high-throughput services. Launch instantly. Release anytime.",
+        browse: "Browse instances", enterConsole: "Open console", regions: "Global regions", uptime: "Platform uptime", delivery: "Average delivery", ready: "Instance ready",
+        inventory: "Available instances", inventoryText: "Live inventory · Billed in USDT per hour", region: "Region", allRegions: "All regions", available: "available", rent: "Rent", perHour: "USDT / hour",
+        featureTitle: <>From selection to SSH<br />in under a minute.</>, feature1: "Transparent inventory", feature1Text: "Live availability and configuration by region", feature2: "USDT settlement", feature2Text: "On-chain payment with automatic balance deduction", feature3: "Release anytime", feature3Text: "Destroy in seconds and stop billing immediately",
+      }
+    : {
+        market: "算力市场", console: "控制台", docs: "开发文档", balance: "钱包", loggedIn: "已登录为 chen@aethercpu.dev",
+        hero: <>把 CPU 算力<br /><em>变成你的速度。</em></>, heroText: "为研发、自动化和高并发服务提供按小时计费的裸金属级性能。创建即用，随时释放。",
+        browse: "浏览实例", enterConsole: "进入控制台", regions: "全球可用区域", uptime: "平台可用性", delivery: "平均交付时间", ready: "实例已就绪",
+        inventory: "可用实例", inventoryText: "实时库存 · 价格以 USDT/小时结算", region: "区域", allRegions: "全部区域", available: "台可用", rent: "租用", perHour: "USDT / 小时",
+        featureTitle: <>从选配到登录，<br />不超过一分钟。</>, feature1: "透明库存", feature1Text: "实时显示每个区域的可用机器与配置", feature2: "USDT 结算", feature2Text: "支持链上付款，余额自动抵扣", feature3: "随时释放", feature3Text: "秒级销毁，停止之后不再产生实例费用",
+      };
 
   return (
-    <main>
+    <main lang={en ? "en" : "zh-CN"}>
       <nav className="nav shell">
         <button className="brand" onClick={() => setView("market")} aria-label="返回首页">
           <span className="brand-mark">◈</span><span>HEXBIT<span>CPU</span></span>
         </button>
         <div className="nav-links">
-          <button onClick={() => setView("market")} className={view === "market" ? "active" : ""}>算力市场</button>
-          <button onClick={() => setView("console")} className={view === "console" ? "active" : ""}>控制台</button>
-          <button onClick={() => setNotice("文档中心即将开放")}>开发文档</button>
+          <button onClick={() => setView("market")} className={view === "market" ? "active" : ""}>{copy.market}</button>
+          <button onClick={() => setView("console")} className={view === "console" ? "active" : ""}>{copy.console}</button>
+          <button onClick={() => setNotice(en ? "Documentation is coming soon" : "文档中心即将开放")}>{copy.docs}</button>
         </div>
-        <div className="nav-actions"><span className="balance">钱包 · 1,284.50 USDT</span><button className="avatar" onClick={() => setNotice("已登录为 chen@aethercpu.dev")}>CH</button></div>
+        <div className="nav-actions"><select className="language-switcher" value={locale} onChange={(event) => setLocale(event.target.value as "zh" | "en")} aria-label="Language"><option value="zh">中文</option><option value="en">EN</option></select><span className="balance">{copy.balance} · 1,284.50 USDT</span><button className="avatar" onClick={() => setNotice(copy.loggedIn)}>CH</button></div>
       </nav>
 
       {view === "market" ? (
         <>
           <section className="hero shell">
             <div className="eyebrow"><i /> ON-DEMAND COMPUTE · 2026</div>
-            <h1>把 CPU 算力<br /><em>变成你的速度。</em></h1>
-            <p>为研发、自动化和高并发服务提供按小时计费的裸金属级性能。创建即用，随时释放。</p>
-            <div className="hero-actions"><button className="primary" onClick={() => document.getElementById("inventory")?.scrollIntoView({ behavior: "smooth" })}>浏览实例 <span>↓</span></button><button className="secondary" onClick={() => setView("console")}>进入控制台</button></div>
-            <div className="hero-stats"><div><b>32</b><span>全球可用区域</span></div><div><b>99.95%</b><span>平台可用性</span></div><div><b>&lt; 60s</b><span>平均交付时间</span></div></div>
+            <h1>{copy.hero}</h1>
+            <p>{copy.heroText}</p>
+            <div className="hero-actions"><button className="primary" onClick={() => document.getElementById("inventory")?.scrollIntoView({ behavior: "smooth" })}>{copy.browse} <span>↓</span></button><button className="secondary" onClick={() => setView("console")}>{copy.enterConsole}</button></div>
+            <div className="hero-stats"><div><b>32</b><span>{copy.regions}</span></div><div><b>99.95%</b><span>{copy.uptime}</span></div><div><b>&lt; 60s</b><span>{copy.delivery}</span></div></div>
             <div className="orb orb-one" /><div className="orb orb-two" />
-            <div className="terminal"><div className="terminal-top"><span /><span /><span /><b>实例已就绪</b></div><code><span>$</span> ssh root@sg-c16-048.aethercpu.net<br /><small>Welcome to Aether Compute · Ubuntu 24.04 LTS</small><br /><span>$</span> <i>_</i></code></div>
+            <div className="terminal"><div className="terminal-top"><span /><span /><span /><b>{copy.ready}</b></div><code><span>$</span> ssh root@sg-c16-048.aethercpu.net<br /><small>Welcome to HEXBIT Compute · Ubuntu 24.04 LTS</small><br /><span>$</span> <i>_</i></code></div>
           </section>
 
           <section id="inventory" className="market shell">
-            <div className="section-head"><div><span className="eyebrow"><i /> LIVE INVENTORY</span><h2>可用实例</h2><p>实时库存 · 价格以 USDT/小时结算</p></div><div className="filters"><label>区域</label><select value={region} onChange={(e) => setRegion(e.target.value)}><option>全部区域</option><option>Singapore</option><option>Hong Kong</option><option>Tokyo</option><option>Frankfurt</option><option>Los Angeles</option></select></div></div>
+            <div className="section-head"><div><span className="eyebrow"><i /> LIVE INVENTORY</span><h2>{copy.inventory}</h2><p>{copy.inventoryText}</p></div><div className="filters"><label>{copy.region}</label><select value={region} onChange={(e) => setRegion(e.target.value)}><option value="all">{copy.allRegions}</option><option>Singapore</option><option>Hong Kong</option><option>Tokyo</option><option>Frankfurt</option><option>Los Angeles</option></select></div></div>
             <div className="machine-grid">
               {inventory.map((m) => <article className="machine" key={m.id}>
-                <div className="machine-top"><span className="availability"><i /> {m.stock} 台可用</span>{m.badge && <span className="tag">{m.badge}</span>}</div>
+                <div className="machine-top"><span className="availability"><i /> {m.stock} {copy.available}</span>{m.badge && <span className="tag">{m.badge}</span>}</div>
                 <h3>{m.name}</h3><p className="machine-region">⌖ {m.region} · {m.cpu}</p>
                 <div className="specs"><span><b>{m.cores}</b> vCPU</span><span><b>{m.memory}</b> RAM</span><span><b>{m.disk}</b> NVMe</span><span><b>{m.network}</b> 网络</span></div>
-                <div className="machine-bottom"><div><strong>${m.price.toFixed(3)}</strong><small> USDT / 小时</small></div><button onClick={() => selectMachine(m)} disabled={!m.stock}>租用 →</button></div>
+                <div className="machine-bottom"><div><strong>${m.price.toFixed(3)}</strong><small> {copy.perHour}</small></div><button onClick={() => selectMachine(m)} disabled={!m.stock}>{copy.rent} →</button></div>
               </article>)}
             </div>
           </section>
 
-          <section className="features shell"><div><span className="eyebrow"><i /> BUILT FOR VELOCITY</span><h2>从选配到登录，<br />不超过一分钟。</h2></div><div className="feature-list"><p><b>01</b><span>透明库存</span><small>实时显示每个区域的可用机器与配置</small></p><p><b>02</b><span>USDT 结算</span><small>支持链上付款，余额自动抵扣</small></p><p><b>03</b><span>随时释放</span><small>秒级销毁，停止之后不再产生实例费用</small></p></div></section>
+          <section className="features shell"><div><span className="eyebrow"><i /> BUILT FOR VELOCITY</span><h2>{copy.featureTitle}</h2></div><div className="feature-list"><p><b>01</b><span>{copy.feature1}</span><small>{copy.feature1Text}</small></p><p><b>02</b><span>{copy.feature2}</span><small>{copy.feature2Text}</small></p><p><b>03</b><span>{copy.feature3}</span><small>{copy.feature3Text}</small></p></div></section>
         </>
       ) : <Console onNotice={setNotice} onRent={() => setView("market")} />}
 
