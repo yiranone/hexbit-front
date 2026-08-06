@@ -113,3 +113,17 @@ release/aethercpu-deploy.tar.gz
 ```
 
 此包包含生产构建产物和 Sites 部署配置。当前命令只完成本地自动打包；接入 Cloudflare、Docker、服务器 SSH 或 CI/CD 后，可在同一流程的最后一步加入实际发布。
+
+## GitHub 自动部署
+
+推送到 `main` 后，GitHub Actions 会自动安装依赖、构建 `dist`、压缩并通过 SSH 部署到服务器。首次启用前，在仓库的 **Settings → Secrets and variables → Actions** 配置：
+
+| 类型 | 名称 | 内容 |
+| --- | --- | --- |
+| Variable | `DEPLOY_HOST` | 服务器域名或 IP |
+| Variable | `DEPLOY_SSH_PORT` | SSH 端口，默认 `22` |
+| Variable | `DEPLOY_TARGET_DIR` | 部署目录，例如 `/var/www/hexbit-front` |
+| Secret | `DEPLOY_SSH_USER` | 服务器 SSH 用户名 |
+| Secret | `DEPLOY_SSH_PRIVATE_KEY` | 对应用户的私钥全文 |
+
+部署工作流先在服务器临时目录解压并校验，再切换到目标目录；旧版本只会在新版本就绪后删除。
