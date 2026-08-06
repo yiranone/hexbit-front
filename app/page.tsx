@@ -56,7 +56,7 @@ export default function Home() {
     <main>
       <nav className="nav shell">
         <button className="brand" onClick={() => setView("market")} aria-label="返回首页">
-          <span className="brand-mark">◈</span><span>AETHER<span>CPU</span></span>
+          <span className="brand-mark">◈</span><span>HEXBIT<span>CPU</span></span>
         </button>
         <div className="nav-links">
           <button onClick={() => setView("market")} className={view === "market" ? "active" : ""}>算力市场</button>
