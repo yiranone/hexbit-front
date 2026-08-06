@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 100" role="img" aria-label="HEXBIT">
+<title>HEXBIT</title>
+<g transform="translate(50,50)">
+<polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#A78BFA"/>
+<g transform="translate(31.18,0)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(15.59,-27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(-15.59,-27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(-31.18,0)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(-15.59,27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(15.59,27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+</g>
+<text x="115" y="70" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif" font-size="56" font-weight="500" letter-spacing="1.5" fill="#1A0F33">HEX<tspan fill="#A78BFA">BIT</tspan></text>
+</svg>

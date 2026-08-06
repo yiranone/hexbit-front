@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="hexbit mark">
+<title>hexbit mark</title>
+<g transform="translate(50,50)">
+<polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#A78BFA"/>
+<g transform="translate(31.18,0)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(15.59,-27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(-15.59,-27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(-31.18,0)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(-15.59,27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+<g transform="translate(15.59,27)"><polygon points="0,-18 15.59,-9 15.59,9 0,18 -15.59,9 -15.59,-9" fill="#1A0F33"/></g>
+</g>
+</svg>
