@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ConsoleSections } from "./console-sections";
+import { ConsoleSections, initialInstances, type Instance } from "./console-sections";
+import type { ServerCreateRequest } from "./create-server";
 import {
   Activity,
   Bell,
   BookOpen,
   Box,
+  Check,
   ChevronRight,
   CircleDollarSign,
   CloudCog,
@@ -24,8 +26,10 @@ import {
   ReceiptText,
   Server,
   ShieldCheck,
+  Send,
   Sparkles,
   WalletCards,
+  X,
 } from "lucide-react";
 
 type Machine = {
@@ -59,11 +63,14 @@ export default function Home() {
   const [selected, setSelected] = useState<Machine | null>(null);
   const [hours, setHours] = useState(24);
   const [paid, setPaid] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("USDT · TRC20");
   const [notice, setNotice] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [chargeOpen, setChargeOpen] = useState(false);
   const [balance, setBalance] = useState(1284.5);
+  const [consoleInstances, setConsoleInstances] = useState<Instance[]>(initialInstances);
+  const [consoleStartSection, setConsoleStartSection] = useState("首页");
 
   const inventory = useMemo(
     () => machines.filter((m) => region === "all" || m.region === region),
@@ -149,11 +156,11 @@ export default function Home() {
 
           <section className="features shell"><div><span className="eyebrow"><i /> BUILT FOR VELOCITY</span><h2>{copy.featureTitle}</h2></div><div className="feature-list"><p><b>01</b><span>{copy.feature1}</span><small>{copy.feature1Text}</small></p><p><b>02</b><span>{copy.feature2}</span><small>{copy.feature2Text}</small></p><p><b>03</b><span>{copy.feature3}</span><small>{copy.feature3Text}</small></p></div></section>
         </>
-      ) : <DashboardConsole onNotice={setNotice} onRent={() => setView("market")} onCharge={() => setChargeOpen(true)} balance={balance} />}
+      ) : <DashboardConsole onNotice={setNotice} onCharge={() => setChargeOpen(true)} balance={balance} instances={consoleInstances} setInstances={setConsoleInstances} initialSection={consoleStartSection} />}
 
       {selected && <div className="modal-backdrop" role="presentation" onMouseDown={() => setSelected(null)}><section className="checkout" role="dialog" aria-modal="true" aria-label="创建实例" onMouseDown={(e) => e.stopPropagation()}>
         <button className="close" onClick={() => setSelected(null)}>×</button>
-        {!paid ? <><span className="eyebrow"><i /> NEW INSTANCE</span><h2>确认租用配置</h2><div className="order-machine"><b>{selected.name}</b><span>⌖ {selected.region} · {selected.cores} vCPU · {selected.memory}</span></div><label className="field">租用时长 <div className="stepper"><button onClick={() => setHours(Math.max(1, hours - 1))}>−</button><b>{hours} 小时</b><button onClick={() => setHours(hours + 1)}>+</button></div></label><div className="payment"><div><span>支付方式</span><b>₮ USDT · TRC20</b></div><button>切换</button></div><div className="total"><span>订单总计</span><strong>{total} <small>USDT</small></strong></div><button className="primary wide" onClick={() => setPaid(true)}>确认并支付 {total} USDT</button><p className="muted">演示原型：付款不会发起真实链上交易。</p></> : <div className="success"><div className="check">✓</div><span className="eyebrow"><i /> PAYMENT CONFIRMED</span><h2>实例正在开通</h2><p>预计 42 秒后可通过 SSH 登录。详情会出现在控制台的「实例管理」中。</p><button className="primary wide" onClick={() => { setSelected(null); setView("console"); }}>查看实例控制台 →</button></div>}
+        {!paid ? <><span className="eyebrow"><i /> NEW INSTANCE</span><h2>确认租用配置</h2><div className="order-machine"><b>{selected.name}</b><span>⌖ {selected.region} · {selected.cores} vCPU · {selected.memory}</span></div><label className="field">租用时长 <div className="stepper"><button onClick={() => setHours(Math.max(1, hours - 1))}>−</button><b>{hours} 小时</b><button onClick={() => setHours(hours + 1)}>+</button></div></label><div className="payment"><div><span>支付方式</span><b>{paymentMethod === "USDT · TRC20" ? "₮" : "$"} {paymentMethod}</b></div><button onClick={() => setPaymentMethod((current) => current === "USDT · TRC20" ? "账户余额" : "USDT · TRC20")}>切换</button></div><div className="total"><span>订单总计</span><strong>{total} <small>USDT</small></strong></div><button className="primary wide" onClick={() => setPaid(true)}>确认并支付 {total} USDT</button><p className="muted">演示原型：付款不会发起真实链上交易。</p></> : <div className="success"><div className="check">✓</div><span className="eyebrow"><i /> PAYMENT CONFIRMED</span><h2>实例正在开通</h2><p>预计 42 秒后可通过 SSH 登录。详情会出现在控制台的「实例管理」中。</p><button className="primary wide" onClick={() => { const machine = selected; setConsoleInstances((items) => [...items, { id: `market-${machine.id}-${Date.now()}`, name: `${machine.name.toLowerCase().replace(/\s+/g, "-")}-${Date.now().toString().slice(-4)}`, status: "运行中", region: machine.region, zone: machine.region, spec: `${machine.name} · ${machine.cores}C ${machine.memory}`, disk: machine.disk, os: "Ubuntu 24.04", publicIp: "分配中", privateIp: "自动分配", billing: `按量计费 · ${hours} 小时`, price: `$${machine.price.toFixed(3)}/h` }]); setConsoleStartSection("实例管理"); setSelected(null); setView("console"); }}>查看实例控制台 →</button></div>}
       </section></div>}
       {notice && <div className="toast">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {loginOpen && <div className="modal-backdrop"><section className="auth-card" role="dialog" aria-modal="true" aria-label="登录"><button className="close" onClick={() => setLoginOpen(false)}>×</button><span className="eyebrow"><i /> HEXBITCPU CONSOLE</span><h2>{en ? "Sign in to your console" : "登录控制台"}</h2><p>{en ? "Manage servers, balance and model API usage in one workspace." : "在一个工作台中管理服务器、余额和模型 API 用量。"}</p><label>{en ? "Email" : "邮箱"}<input type="email" placeholder="name@company.com" defaultValue="chen@aethercpu.dev" /></label><label>{en ? "Password" : "密码"}<input type="password" placeholder="••••••••" defaultValue="demo-password" /></label><button className="primary wide" onClick={signIn}>{en ? "Sign in" : "登录"} →</button><small>{en ? "Demo mode — no real account is required." : "演示模式，无需真实账户。"}</small></section></div>}
@@ -162,8 +169,16 @@ export default function Home() {
   );
 }
 
-function DashboardConsole({ onNotice, onRent, onCharge, balance }: { onNotice: (value: string) => void; onRent: () => void; onCharge: () => void; balance: number }) {
-  const [section, setSection] = useState("首页");
+function DashboardConsole({ onNotice, onCharge, balance, instances, setInstances, initialSection }: { onNotice: (value: string) => void; onCharge: () => void; balance: number; instances: Instance[]; setInstances: React.Dispatch<React.SetStateAction<Instance[]>>; initialSection: string }) {
+  const [section, setSection] = useState(initialSection);
+  const [createServerRequest, setCreateServerRequest] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [consoleRegion, setConsoleRegion] = useState("中国重庆二区");
+  const [regionOpen, setRegionOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantText, setAssistantText] = useState("");
+  const [assistantMessages, setAssistantMessages] = useState<string[]>(["您好，我可以帮助查询资源、费用和告警状态。"]);
+  const [profileOpen, setProfileOpen] = useState(false);
   const navItems = [
     { label: "首页", icon: LayoutDashboard },
     { label: "模型 API", icon: Sparkles },
@@ -174,22 +189,58 @@ function DashboardConsole({ onNotice, onRent, onCharge, balance }: { onNotice: (
     { label: "用量与账单", icon: ReceiptText },
     { label: "API 密钥", icon: KeyRound },
   ];
+  const sendAssistantMessage = () => {
+    const message = assistantText.trim();
+    if (!message) return;
+    setAssistantMessages((items) => [...items, `您：${message}`, "AI 助手：已根据当前控制台数据生成处理建议，相关资源状态正常。"]);
+    setAssistantText("");
+  };
+  const openServerCreate = () => {
+    setCreateServerRequest(true);
+    setSection("GPU 服务器");
+  };
+  const createServers = (request: ServerCreateRequest) => {
+    const createdAt = Date.now();
+    const zoneParts = request.zone.split(" / ");
+    const created = Array.from({ length: request.quantity }, (_, index): Instance => ({
+      id: `ins-cq-${createdAt}-${index + 1}`,
+      name: request.quantity > 1 ? `${request.serverName}-${String(index + 1).padStart(2, "0")}` : request.serverName,
+      status: "已停止",
+      region: zoneParts[0],
+      zone: zoneParts[1] ?? request.zone,
+      spec: `${request.spec.gpu} ${request.spec.vram} · ${request.spec.cores} ${request.spec.memory}`,
+      disk: "NVMe 480 GiB",
+      os: request.image,
+      publicIp: "未绑定",
+      privateIp: request.privateIp ?? `192.168.1.${20 + index}`,
+      billing: `包月 · ${request.duration} 个月`,
+      price: `¥${request.spec.price.toLocaleString("zh-CN")}/mo`,
+      duration: request.duration,
+      autoRenew: request.autoRenew,
+      vpc: request.vpc,
+      resourceGroup: request.resourceGroup,
+    }));
+    setInstances((items) => [...items, ...created]);
+    setCreateServerRequest(false);
+    setSection("实例管理");
+  };
 
-  return <section className="dashboard">
+  return <section className={`dashboard ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
     <aside className="dashboard-side">
       <img className="side-logo-full" src="/hexbit-logo-primary.svg" alt="HEXBIT" />
       <img className="side-logo-mark" src="/hexbit-mark.svg" alt="" />
-      <div className="side-nav">{navItems.map(({ label, icon: Icon }) => <button key={label} className={section === label ? "active" : ""} onClick={() => setSection(label)}><Icon size={17} />{label}<ChevronRight size={15} /></button>)}</div>
-      <div className="side-bottom"><button onClick={onCharge}><WalletCards size={17} />财务与充值<ChevronRight size={15} /></button><button onClick={() => onNotice("已打开帮助中心")}><HelpCircle size={17} />帮助中心</button></div>
+      <div className="side-nav">{navItems.map(({ label, icon: Icon }) => <button key={label} title={sidebarCollapsed ? label : undefined} aria-label={label} className={section === label ? "active" : ""} onClick={() => setSection(label)}><Icon size={17} />{label}<ChevronRight size={15} /></button>)}</div>
+      <div className="side-bottom"><button title={sidebarCollapsed ? "财务与充值" : undefined} aria-label="财务与充值" onClick={onCharge}><WalletCards size={17} />财务与充值<ChevronRight size={15} /></button><button title={sidebarCollapsed ? "帮助中心" : undefined} aria-label="帮助中心" onClick={() => setSection("帮助中心")}><HelpCircle size={17} />帮助中心</button></div>
     </aside>
     <div className="dashboard-work">
       <header className="dashboard-top">
-        <div className="console-context"><button className="top-icon" aria-label="展开菜单"><Menu size={19} /></button><span>区域</span><button className="region-select"><Globe2 size={15} />中国重庆二区</button></div>
-        <nav className="top-links"><button onClick={() => setSection("用量与账单")}>费用</button><button onClick={() => setSection("资源中心")}>资源</button><button onClick={() => onNotice("已打开用户与权限")}>用户</button><button onClick={() => onNotice("已打开文档中心")}>文档</button></nav>
-        <div className="top-actions"><button className="agent-pill"><Sparkles size={14} />AI 助手</button><button className="top-icon" aria-label="通知" onClick={() => onNotice("暂无新通知")}><Bell size={18} /></button><button className="wallet-pill" onClick={onCharge}><CircleDollarSign size={15} />{balance.toFixed(2)} USDT</button><button className="profile" title="zhejiangshengwang">ZW</button></div>
+        <div className="console-context"><button className="top-icon" aria-label={sidebarCollapsed ? "展开左侧菜单" : "收起左侧菜单"} aria-expanded={!sidebarCollapsed} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}><Menu size={19} /></button><span>区域</span><div className="top-popover-wrap"><button className="region-select" aria-expanded={regionOpen} onClick={() => setRegionOpen((open) => !open)}><Globe2 size={15} />{consoleRegion}<ChevronRight size={13} /></button>{regionOpen && <div className="top-popover region-popover" role="menu">{["中国重庆二区", "新加坡一区", "中国香港一区", "日本东京一区"].map((item) => <button key={item} className={consoleRegion === item ? "selected" : ""} onClick={() => { setConsoleRegion(item); setRegionOpen(false); onNotice(`区域已切换为${item}`); }}>{item}{consoleRegion === item && <Check size={14} />}</button>)}</div>}</div></div>
+        <nav className="top-links"><button onClick={() => setSection("用量与账单")}>费用</button><button onClick={() => setSection("资源中心")}>资源</button><button onClick={() => setSection("用户与权限")}>用户</button><button onClick={() => setSection("帮助中心")}>文档</button></nav>
+        <div className="top-actions"><button className="agent-pill" onClick={() => setAssistantOpen(true)}><Sparkles size={14} />AI 助手</button><button className="top-icon" aria-label="通知" onClick={() => setSection("消息中心")}><Bell size={18} /></button><button className="wallet-pill" onClick={onCharge}><CircleDollarSign size={15} />{balance.toFixed(2)} USDT</button><div className="top-popover-wrap"><button className="profile" title="zhejiangshengwang" aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)}>ZW</button>{profileOpen && <div className="top-popover profile-popover" role="menu"><div><b>zhejiangshengwang</b><span>根用户 · 线下签约</span></div><button onClick={() => { setSection("API 密钥"); setProfileOpen(false); }}>访问密钥</button><button onClick={() => { setSection("用量与账单"); setProfileOpen(false); }}>计费账户</button><button onClick={() => { setSection("账号中心"); setProfileOpen(false); }}>账号资料</button></div>}</div></div>
       </header>
-      <main className="dashboard-content">{section === "首页" ? <ConsoleHome balance={balance} onCharge={onCharge} onNotice={onNotice} onRent={onRent} setSection={setSection} /> : <ConsoleSections section={section} onRent={onRent} onCharge={onCharge} onNotice={onNotice} balance={balance} />}</main>
+      <main className="dashboard-content">{section === "首页" ? <ConsoleHome balance={balance} onCharge={onCharge} onNotice={onNotice} onRent={openServerCreate} setSection={setSection} /> : <ConsoleSections section={section} onRent={openServerCreate} onCharge={onCharge} onNotice={onNotice} balance={balance} createServerRequest={createServerRequest} onCreateServerHandled={() => setCreateServerRequest(false)} instances={instances} setInstances={setInstances} onServerCreated={createServers} />}</main>
     </div>
+    {assistantOpen && <div className="assistant-backdrop" onMouseDown={() => setAssistantOpen(false)}><aside className="assistant-drawer" role="dialog" aria-modal="true" aria-label="AI 助手" onMouseDown={(event) => event.stopPropagation()}><header><div><Sparkles size={17} /><span><b>AI 助手</b><small>控制台资源助手</small></span></div><button className="icon-button" aria-label="关闭 AI 助手" onClick={() => setAssistantOpen(false)}><X size={16} /></button></header><div className="assistant-quick">{["检查资源状态", "分析本月费用", "查看未处理告警"].map((item) => <button key={item} onClick={() => setAssistantMessages((messages) => [...messages, `您：${item}`, `AI 助手：${item}已完成，当前未发现异常。`])}>{item}</button>)}</div><div className="assistant-messages">{assistantMessages.map((message, index) => <p key={`${message}${index}`} className={message.startsWith("您：") ? "user" : "assistant"}>{message}</p>)}</div><div className="assistant-input"><input value={assistantText} onChange={(event) => setAssistantText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") sendAssistantMessage(); }} placeholder="询问资源、费用或告警" /><button aria-label="发送消息" disabled={!assistantText.trim()} onClick={sendAssistantMessage}><Send size={16} /></button></div></aside></div>}
   </section>;
 }
 
@@ -210,15 +261,15 @@ function ConsoleHome({ balance, onCharge, onNotice, onRent, setSection }: { bala
       <div className="home-main">
         <section className="panel quick-panel"><div className="panel-title"><div><h2>最近访问</h2><p>常用云服务与管理入口</p></div><button className="text-button" onClick={() => onNotice("自定义入口已打开")}>自定义</button></div><div className="quick-links">{quickLinks.map(([label, Icon]) => <button key={label} onClick={() => label.includes("费用") ? setSection("用量与账单") : label.includes("资源管理") || label.includes("数据管理") ? setSection("资源中心") : label.includes("算力") || label.includes("计算") ? setSection("GPU 服务器") : onNotice(`已打开${label}`)}><Icon size={17} /><span>{label}</span><ChevronRight size={14} /></button>)}</div></section>
         <section className="service-banner"><div><span>MODELSTUDIO</span><h2>模型开发与推理服务已升级</h2><p>统一管理模型 API、GPU 算力和实例资源。</p></div><button onClick={() => setSection("模型 API")}>立即体验<ChevronRight size={15} /></button></section>
-        <section className="panel service-overview"><div className="panel-title"><div><h2>我的服务</h2><p>云资源运行概览</p></div><button className="text-button" onClick={() => setSection("云监控")}>查看全部</button></div><div className="service-body"><div className="service-map"><div className="map-grid">{Array.from({ length: 12 }).map((_, index) => <i key={index} className={index === 6 ? "active" : index === 9 ? "warning" : ""}><Box size={16} /></i>)}</div><div className="map-legend"><span><i />已拥有</span><span><i />未拥有</span><span><i />待续费</span></div></div><div className="service-detail"><div className="service-detail-head"><div className="service-logo"><Gauge size={22} /></div><div><h3>云监控服务 CMS</h3><span className="status-label success"><i />运行正常</span></div></div><p>从基础设施、系统服务与运行任务等维度监控云资源，集中查看状态与告警。</p><div className="service-actions"><button className="secondary" onClick={() => setSection("云监控")}>查看详情</button><button className="primary" onClick={() => setSection("云监控")}>前往控制台</button></div><div className="related-services"><span>关联产品</span><button>文件存储 AFS</button><button>对象存储 AOSS</button><button>云服务器 CCI</button></div></div></div></section>
+        <section className="panel service-overview"><div className="panel-title"><div><h2>我的服务</h2><p>云资源运行概览</p></div><button className="text-button" onClick={() => setSection("云监控")}>查看全部</button></div><div className="service-body"><div className="service-map"><div className="map-grid">{Array.from({ length: 12 }).map((_, index) => <i key={index} className={index === 6 ? "active" : index === 9 ? "warning" : ""}><Box size={16} /></i>)}</div><div className="map-legend"><span><i />已拥有</span><span><i />未拥有</span><span><i />待续费</span></div></div><div className="service-detail"><div className="service-detail-head"><div className="service-logo"><Gauge size={22} /></div><div><h3>云监控服务 CMS</h3><span className="status-label success"><i />运行正常</span></div></div><p>从基础设施、系统服务与运行任务等维度监控云资源，集中查看状态与告警。</p><div className="service-actions"><button className="secondary" onClick={() => setSection("云监控")}>查看详情</button><button className="primary" onClick={() => setSection("云监控")}>前往控制台</button></div><div className="related-services"><span>关联产品</span><button onClick={() => setSection("资源中心")}>文件存储 AFS</button><button onClick={() => setSection("资源中心")}>对象存储 AOSS</button><button onClick={() => setSection("实例管理")}>云服务器 CCI</button></div></div></div></section>
         <section className="panel resource-panel"><div className="panel-title"><div><h2>我的资源</h2><p>当前区域资源状态</p></div><button className="text-button" onClick={() => setSection("资源中心")}>资源管理</button></div><div className="resource-grid"><article><div><Globe2 size={19} /><span>弹性公网 IP</span></div><b>1</b><small>实例 · 100 Mbps 带宽</small></article><article><div><Network size={19} /><span>私有网络 VPC</span></div><b>1</b><small>21 个子网 · 全部正常</small></article><article><div><Server size={19} /><span>计算实例</span></div><b>3</b><small>2 个运行中 · 1 个已停止</small></article><article><div><Database size={19} /><span>存储卷</span></div><b>4</b><small>2.4 TiB 已分配</small></article></div></section>
       </div>
       <aside className="home-rail">
-        <section className="panel account-panel"><button className="panel-link" onClick={() => onNotice("已打开账号中心")}>账号中心<ChevronRight size={14} /></button><div className="account-row"><div className="account-avatar">ZW</div><div><b>zhejiangshengwang</b><span>线下签约 · 根用户</span></div></div><p>企业标识：<strong>zhejiangshengwang</strong></p><div className="account-key"><span>访问密钥</span><b>1 / 1</b><button onClick={() => setSection("API 密钥")}>管理</button></div></section>
+        <section className="panel account-panel"><button className="panel-link" onClick={() => setSection("账号中心")}>账号中心<ChevronRight size={14} /></button><div className="account-row"><div className="account-avatar">ZW</div><div><b>zhejiangshengwang</b><span>线下签约 · 根用户</span></div></div><p>企业标识：<strong>zhejiangshengwang</strong></p><div className="account-key"><span>访问密钥</span><b>1 / 1</b><button onClick={() => setSection("API 密钥")}>管理</button></div></section>
         <section className="panel finance-panel"><button className="panel-link" onClick={() => setSection("用量与账单")}>费用中心<ChevronRight size={14} /></button><span>可用余额</span><strong>{balance.toFixed(2)} <small>USDT</small></strong><button className="primary" onClick={onCharge}>充值</button><div className="finance-stats"><div><b className="danger">1</b><span>超期订单</span></div><div><b>0</b><span>即将到期</span></div><div><b>0</b><span>待支付</span></div></div></section>
-        <section className="panel alerts-panel"><button className="panel-link" onClick={() => onNotice("已打开告警规则")}>资源预警<ChevronRight size={14} /></button><div className="alert-stats"><div><b>0</b><span>紧急告警</span></div><div><b>0</b><span>重要告警</span></div><div><b>0</b><span>近 7 天</span></div></div><div className="health-line"><ShieldCheck size={17} /><span>所有监控项运行正常</span></div></section>
-        <section className="panel message-panel"><div className="panel-title"><div><h2>产品消息</h2><p>最近通知</p></div><button className="text-button" onClick={() => onNotice("已打开消息中心")}>全部</button></div><div className="message-list">{messages.map(([type, text, time]) => <button key={text} onClick={() => onNotice(text)}><i /><span><b>{type}</b><small>{text}</small><time>{time}</time></span></button>)}</div></section>
-        <section className="support-row"><button onClick={() => onNotice("已打开帮助文档")}><BookOpen size={17} />帮助文档</button><button onClick={() => onNotice("已打开服务支持")}><Activity size={17} />服务支持</button></section>
+        <section className="panel alerts-panel"><button className="panel-link" onClick={() => setSection("云监控")}>资源预警<ChevronRight size={14} /></button><div className="alert-stats"><div><b>0</b><span>紧急告警</span></div><div><b>0</b><span>重要告警</span></div><div><b>0</b><span>近 7 天</span></div></div><div className="health-line"><ShieldCheck size={17} /><span>所有监控项运行正常</span></div></section>
+        <section className="panel message-panel"><div className="panel-title"><div><h2>产品消息</h2><p>最近通知</p></div><button className="text-button" onClick={() => setSection("消息中心")}>全部</button></div><div className="message-list">{messages.map(([type, text, time]) => <button key={text} onClick={() => setSection("消息中心")}><i /><span><b>{type}</b><small>{text}</small><time>{time}</time></span></button>)}</div></section>
+        <section className="support-row"><button onClick={() => setSection("帮助中心")}><BookOpen size={17} />帮助文档</button><button onClick={() => setSection("帮助中心")}><Activity size={17} />服务支持</button></section>
       </aside>
     </div>
   </div>;
