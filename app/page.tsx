@@ -2,6 +2,31 @@
 
 import { useMemo, useState } from "react";
 import { ConsoleSections } from "./console-sections";
+import {
+  Activity,
+  Bell,
+  BookOpen,
+  Box,
+  ChevronRight,
+  CircleDollarSign,
+  CloudCog,
+  Cpu,
+  Database,
+  Gauge,
+  Globe2,
+  Grid2X2,
+  HelpCircle,
+  KeyRound,
+  LayoutDashboard,
+  Menu,
+  Network,
+  Plus,
+  ReceiptText,
+  Server,
+  ShieldCheck,
+  Sparkles,
+  WalletCards,
+} from "lucide-react";
 
 type Machine = {
   id: string;
@@ -139,7 +164,62 @@ export default function Home() {
 
 function DashboardConsole({ onNotice, onRent, onCharge, balance }: { onNotice: (value: string) => void; onRent: () => void; onCharge: () => void; balance: number }) {
   const [section, setSection] = useState("首页");
-  const navItems = [["⌂", "首页"], ["◇", "模型 API"], ["▣", "GPU 服务器"], ["◫", "实例管理"], ["◌", "用量与账单"], ["⌘", "API 密钥"]];
-  const models = [["Q", "Qwen3-235B", "Qwen", "$0.18/M 输入 · $0.72/M 输出"], ["D", "DeepSeek-V3", "DeepSeek", "$0.14/M 输入 · $0.56/M 输出"], ["G", "GLM-4.7", "Zhipu AI", "$0.22/M 输入 · $0.88/M 输出"]];
-  return <section className="dashboard"><aside className="dashboard-side"><img src="/hexbit-logo-primary.svg" alt="HEXBIT" /><div className="side-nav">{navItems.map(([icon, item]) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}><i>{icon}</i>{item}<span>›</span></button>)}</div><div className="side-bottom"><button onClick={onCharge}>◉ 财务与充值 <span>›</span></button><button onClick={() => onNotice("已打开帮助中心")}>? 帮助中心</button></div></aside><div className="dashboard-work"><header className="dashboard-top"><div className="workspace-name">工作区 <b>默认项目⌄</b></div><div><button className="agent-pill">✦ AI 助手</button><button className="top-icon" onClick={() => onNotice("暂无新通知")}>♢</button><button className="wallet-pill" onClick={onCharge}>◉ {balance.toFixed(2)} USDT</button><button className="profile">CH</button></div></header><main className="dashboard-content">{section === "首页" ? <><h1>{section}</h1><h2>快速开始</h2><div className="product-grid"><article><div className="product-icon purple">◇</div><h3>模型 Token API</h3><p>通过 OpenAI 兼容接口使用 Qwen、DeepSeek、GLM 等模型，并支持面向客户的二次分发。</p><button onClick={() => setSection("模型 API")}>获取 API Key →</button></article><article><div className="product-icon blue">▣</div><h3>GPU 服务器</h3><p>创建专属 GPU 实例，部署和运营你的模型、推理服务与 AI 应用。</p><button onClick={onRent}>+ 创建服务器</button></article><article><div className="product-icon coral">◫</div><h3>实例管理</h3><p>统一查看服务器状态、SSH 登录信息、运行时长与资源消费。</p><button onClick={() => setSection("实例管理")}>查看实例 →</button></article></div><div className="launch-panel"><div className="launch-head"><div><h2>模型 API</h2><p>选择模型，获取 API Key 后即可开始调用。</p></div><button onClick={() => setSection("模型 API")}>模型广场 →</button></div><div className="model-grid">{models.map(([mark, name, company, price]) => <article key={name}><b>{mark}</b><h3>{name}</h3><p>{company}</p><small>{price}</small><span>文本生成</span></article>)}</div></div></> : <ConsoleSections section={section} onRent={onRent} onCharge={onCharge} onNotice={onNotice} balance={balance} />}</main></div></section>;
+  const navItems = [
+    { label: "首页", icon: LayoutDashboard },
+    { label: "模型 API", icon: Sparkles },
+    { label: "GPU 服务器", icon: Cpu },
+    { label: "实例管理", icon: Server },
+    { label: "资源中心", icon: Database },
+    { label: "云监控", icon: Activity },
+    { label: "用量与账单", icon: ReceiptText },
+    { label: "API 密钥", icon: KeyRound },
+  ];
+
+  return <section className="dashboard">
+    <aside className="dashboard-side">
+      <img className="side-logo-full" src="/hexbit-logo-primary.svg" alt="HEXBIT" />
+      <img className="side-logo-mark" src="/hexbit-mark.svg" alt="" />
+      <div className="side-nav">{navItems.map(({ label, icon: Icon }) => <button key={label} className={section === label ? "active" : ""} onClick={() => setSection(label)}><Icon size={17} />{label}<ChevronRight size={15} /></button>)}</div>
+      <div className="side-bottom"><button onClick={onCharge}><WalletCards size={17} />财务与充值<ChevronRight size={15} /></button><button onClick={() => onNotice("已打开帮助中心")}><HelpCircle size={17} />帮助中心</button></div>
+    </aside>
+    <div className="dashboard-work">
+      <header className="dashboard-top">
+        <div className="console-context"><button className="top-icon" aria-label="展开菜单"><Menu size={19} /></button><span>区域</span><button className="region-select"><Globe2 size={15} />中国重庆二区</button></div>
+        <nav className="top-links"><button onClick={() => setSection("用量与账单")}>费用</button><button onClick={() => setSection("资源中心")}>资源</button><button onClick={() => onNotice("已打开用户与权限")}>用户</button><button onClick={() => onNotice("已打开文档中心")}>文档</button></nav>
+        <div className="top-actions"><button className="agent-pill"><Sparkles size={14} />AI 助手</button><button className="top-icon" aria-label="通知" onClick={() => onNotice("暂无新通知")}><Bell size={18} /></button><button className="wallet-pill" onClick={onCharge}><CircleDollarSign size={15} />{balance.toFixed(2)} USDT</button><button className="profile" title="zhejiangshengwang">ZW</button></div>
+      </header>
+      <main className="dashboard-content">{section === "首页" ? <ConsoleHome balance={balance} onCharge={onCharge} onNotice={onNotice} onRent={onRent} setSection={setSection} /> : <ConsoleSections section={section} onRent={onRent} onCharge={onCharge} onNotice={onNotice} balance={balance} />}</main>
+    </div>
+  </section>;
+}
+
+function ConsoleHome({ balance, onCharge, onNotice, onRent, setSection }: { balance: number; onCharge: () => void; onNotice: (value: string) => void; onRent: () => void; setSection: (value: string) => void }) {
+  const quickLinks = [
+    ["弹性裸金属 BMS", Server], ["费用与成本", ReceiptText], ["高性能算力池", Cpu],
+    ["资源管理", Grid2X2], ["数据管理平台", Database], ["弹性计算集群", CloudCog],
+  ] as const;
+  const messages = [
+    ["资源到期提醒", "prod-inference-01 将于 3 天后到期", "今天 09:42"],
+    ["续订状态提醒", "自动续订失败，请检查账户余额", "今天 08:16"],
+    ["平台消息", "重庆二区网络维护已完成", "昨天 23:40"],
+  ];
+
+  return <div className="console-home">
+    <div className="home-title"><div><p>CONSOLE OVERVIEW</p><h1>下午好，zhejiangshengwang</h1><span>资源、费用与告警状态已更新</span></div><button className="primary" onClick={onRent}><Plus size={16} />创建资源</button></div>
+    <div className="home-layout">
+      <div className="home-main">
+        <section className="panel quick-panel"><div className="panel-title"><div><h2>最近访问</h2><p>常用云服务与管理入口</p></div><button className="text-button" onClick={() => onNotice("自定义入口已打开")}>自定义</button></div><div className="quick-links">{quickLinks.map(([label, Icon]) => <button key={label} onClick={() => label.includes("费用") ? setSection("用量与账单") : label.includes("资源管理") || label.includes("数据管理") ? setSection("资源中心") : label.includes("算力") || label.includes("计算") ? setSection("GPU 服务器") : onNotice(`已打开${label}`)}><Icon size={17} /><span>{label}</span><ChevronRight size={14} /></button>)}</div></section>
+        <section className="service-banner"><div><span>MODELSTUDIO</span><h2>模型开发与推理服务已升级</h2><p>统一管理模型 API、GPU 算力和实例资源。</p></div><button onClick={() => setSection("模型 API")}>立即体验<ChevronRight size={15} /></button></section>
+        <section className="panel service-overview"><div className="panel-title"><div><h2>我的服务</h2><p>云资源运行概览</p></div><button className="text-button" onClick={() => setSection("云监控")}>查看全部</button></div><div className="service-body"><div className="service-map"><div className="map-grid">{Array.from({ length: 12 }).map((_, index) => <i key={index} className={index === 6 ? "active" : index === 9 ? "warning" : ""}><Box size={16} /></i>)}</div><div className="map-legend"><span><i />已拥有</span><span><i />未拥有</span><span><i />待续费</span></div></div><div className="service-detail"><div className="service-detail-head"><div className="service-logo"><Gauge size={22} /></div><div><h3>云监控服务 CMS</h3><span className="status-label success"><i />运行正常</span></div></div><p>从基础设施、系统服务与运行任务等维度监控云资源，集中查看状态与告警。</p><div className="service-actions"><button className="secondary" onClick={() => setSection("云监控")}>查看详情</button><button className="primary" onClick={() => setSection("云监控")}>前往控制台</button></div><div className="related-services"><span>关联产品</span><button>文件存储 AFS</button><button>对象存储 AOSS</button><button>云服务器 CCI</button></div></div></div></section>
+        <section className="panel resource-panel"><div className="panel-title"><div><h2>我的资源</h2><p>当前区域资源状态</p></div><button className="text-button" onClick={() => setSection("资源中心")}>资源管理</button></div><div className="resource-grid"><article><div><Globe2 size={19} /><span>弹性公网 IP</span></div><b>1</b><small>实例 · 100 Mbps 带宽</small></article><article><div><Network size={19} /><span>私有网络 VPC</span></div><b>1</b><small>21 个子网 · 全部正常</small></article><article><div><Server size={19} /><span>计算实例</span></div><b>3</b><small>2 个运行中 · 1 个已停止</small></article><article><div><Database size={19} /><span>存储卷</span></div><b>4</b><small>2.4 TiB 已分配</small></article></div></section>
+      </div>
+      <aside className="home-rail">
+        <section className="panel account-panel"><button className="panel-link" onClick={() => onNotice("已打开账号中心")}>账号中心<ChevronRight size={14} /></button><div className="account-row"><div className="account-avatar">ZW</div><div><b>zhejiangshengwang</b><span>线下签约 · 根用户</span></div></div><p>企业标识：<strong>zhejiangshengwang</strong></p><div className="account-key"><span>访问密钥</span><b>1 / 1</b><button onClick={() => setSection("API 密钥")}>管理</button></div></section>
+        <section className="panel finance-panel"><button className="panel-link" onClick={() => setSection("用量与账单")}>费用中心<ChevronRight size={14} /></button><span>可用余额</span><strong>{balance.toFixed(2)} <small>USDT</small></strong><button className="primary" onClick={onCharge}>充值</button><div className="finance-stats"><div><b className="danger">1</b><span>超期订单</span></div><div><b>0</b><span>即将到期</span></div><div><b>0</b><span>待支付</span></div></div></section>
+        <section className="panel alerts-panel"><button className="panel-link" onClick={() => onNotice("已打开告警规则")}>资源预警<ChevronRight size={14} /></button><div className="alert-stats"><div><b>0</b><span>紧急告警</span></div><div><b>0</b><span>重要告警</span></div><div><b>0</b><span>近 7 天</span></div></div><div className="health-line"><ShieldCheck size={17} /><span>所有监控项运行正常</span></div></section>
+        <section className="panel message-panel"><div className="panel-title"><div><h2>产品消息</h2><p>最近通知</p></div><button className="text-button" onClick={() => onNotice("已打开消息中心")}>全部</button></div><div className="message-list">{messages.map(([type, text, time]) => <button key={text} onClick={() => onNotice(text)}><i /><span><b>{type}</b><small>{text}</small><time>{time}</time></span></button>)}</div></section>
+        <section className="support-row"><button onClick={() => onNotice("已打开帮助文档")}><BookOpen size={17} />帮助文档</button><button onClick={() => onNotice("已打开服务支持")}><Activity size={17} />服务支持</button></section>
+      </aside>
+    </div>
+  </div>;
 }

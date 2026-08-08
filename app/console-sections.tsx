@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import {
   Activity,
+  Bell,
+  Boxes,
+  CalendarClock,
   Check,
   ChevronDown,
   CircleDollarSign,
@@ -15,6 +18,7 @@ import {
   Gauge,
   HardDrive,
   KeyRound,
+  Layers3,
   MoreHorizontal,
   Network,
   Plus,
@@ -24,6 +28,8 @@ import {
   Search,
   Server,
   ShieldCheck,
+  Tag,
+  TriangleAlert,
   Trash2,
   X,
   Zap,
@@ -82,6 +88,8 @@ export function ConsoleSections(props: ConsoleSectionsProps) {
   if (props.section === "模型 API") return <ModelsPage {...props} />;
   if (props.section === "GPU 服务器") return <GpuPage {...props} />;
   if (props.section === "实例管理") return <InstancesPage {...props} />;
+  if (props.section === "资源中心") return <ResourceCenterPage {...props} />;
+  if (props.section === "云监控") return <MonitorPage {...props} />;
   if (props.section === "用量与账单") return <BillingPage {...props} />;
   return <KeysPage {...props} />;
 }
@@ -114,11 +122,20 @@ function ModelsPage({ onNotice, onCharge }: ConsoleSectionsProps) {
 function GpuPage({ onRent, onNotice }: ConsoleSectionsProps) {
   const [billing, setBilling] = useState("按量计费");
   const [region, setRegion] = useState("全部区域");
+  const [mode, setMode] = useState("GPU 资源池");
+  const tasks = [
+    ["qwen-finetune-v4", "train-cluster-01", "PyTorch", "A100 80G x 4", "4", "高", "运行中"],
+    ["embedding-batch-0821", "inference-pool", "Ray", "L40S 48G x 2", "8", "中", "排队中"],
+    ["vision-eval", "dev-cluster", "PyTorch", "RTX 4090 x 1", "1", "普通", "已完成"],
+  ];
   return <div className="console-page">
     <PageHeader eyebrow="COMPUTE / GPU MARKET" title="GPU 服务器" description="按工作负载选择 GPU，支持虚拟机、裸金属和竞价实例。" action="创建服务器" onAction={onRent} />
-    <div className="availability-strip"><span><Zap size={18} />实时库存</span><div><b>39</b> 张 GPU 可立即部署</div><small>库存更新于 12 秒前</small><button className="icon-button" title="刷新库存" onClick={() => onNotice("库存已刷新")}><RefreshCw size={15} /></button></div>
-    <section className="panel table-panel"><div className="table-toolbar gpu-toolbar"><div className="segmented">{["按量计费", "包月", "竞价实例"].map((item) => <button key={item} className={billing === item ? "active" : ""} onClick={() => setBilling(item)}>{item}</button>)}</div><div className="toolbar-actions"><label className="select-control"><Network size={15} /><select value={region} onChange={(event) => setRegion(event.target.value)}><option>全部区域</option><option>Singapore</option><option>Hong Kong</option><option>Tokyo</option></select><ChevronDown size={14} /></label><button className="outline-button"><Filter size={14} />更多筛选</button></div></div><div className="responsive-table"><div className="table-row table-head gpu-table"><span>GPU 型号</span><span>计算配置</span><span>区域 / 可用区</span><span>库存</span><span>{billing === "包月" ? "包月单价" : "按量单价"}</span><span>长期价格</span><span /></div>{gpuRows.filter((gpu) => region === "全部区域" || gpu.region.startsWith(region)).map((gpu) => <div className="table-row gpu-table" key={gpu.name}><div className="gpu-name"><span className="gpu-mark">GPU</span><span><strong>{gpu.name}</strong><small>{gpu.vram}</small></span></div><span>{gpu.compute}</span><span>{gpu.region}</span><span className="stock"><i />{gpu.stock} 可用</span><strong>{billing === "包月" ? gpu.monthly : gpu.ondemand}<small> / GPU / 时</small></strong><span>{gpu.monthly}<small className="saving">{gpu.saving}</small></span><button className="primary compact" onClick={onRent}>部署</button></div>)}</div></section>
-    <div className="resource-notes"><article><HardDrive size={19} /><div><b>块存储</b><span>从 $0.0002 / GiB / 小时</span></div></article><article><Network size={19} /><div><b>公网与 VPC</b><span>共享带宽免费，独享带宽按量</span></div></article><article><ShieldCheck size={19} /><div><b>安全组</b><span>默认拒绝入站，可绑定 4 个规则组</span></div></article></div>
+    <div className="module-tabs">{["GPU 资源池", "算力任务"].map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}</div>
+    {mode === "GPU 资源池" ? <>
+      <div className="availability-strip"><span><Zap size={18} />实时库存</span><div><b>39</b> 张 GPU 可立即部署</div><small>库存更新于 12 秒前</small><button className="icon-button" title="刷新库存" onClick={() => onNotice("库存已刷新")}><RefreshCw size={15} /></button></div>
+      <section className="panel table-panel"><div className="table-toolbar gpu-toolbar"><div className="segmented">{["按量计费", "包月", "竞价实例"].map((item) => <button key={item} className={billing === item ? "active" : ""} onClick={() => setBilling(item)}>{item}</button>)}</div><div className="toolbar-actions"><label className="select-control"><Network size={15} /><select value={region} onChange={(event) => setRegion(event.target.value)}><option>全部区域</option><option>Singapore</option><option>Hong Kong</option><option>Tokyo</option></select><ChevronDown size={14} /></label><button className="outline-button"><Filter size={14} />更多筛选</button></div></div><div className="responsive-table"><div className="table-row table-head gpu-table"><span>GPU 型号</span><span>计算配置</span><span>区域 / 可用区</span><span>库存</span><span>{billing === "包月" ? "包月单价" : "按量单价"}</span><span>长期价格</span><span /></div>{gpuRows.filter((gpu) => region === "全部区域" || gpu.region.startsWith(region)).map((gpu) => <div className="table-row gpu-table" key={gpu.name}><div className="gpu-name"><span className="gpu-mark">GPU</span><span><strong>{gpu.name}</strong><small>{gpu.vram}</small></span></div><span>{gpu.compute}</span><span>{gpu.region}</span><span className="stock"><i />{gpu.stock} 可用</span><strong>{billing === "包月" ? gpu.monthly : gpu.ondemand}<small> / GPU / 时</small></strong><span>{gpu.monthly}<small className="saving">{gpu.saving}</small></span><button className="primary compact" onClick={onRent}>部署</button></div>)}</div></section>
+      <div className="resource-notes"><article><HardDrive size={19} /><div><b>块存储</b><span>从 $0.0002 / GiB / 小时</span></div></article><article><Network size={19} /><div><b>公网与 VPC</b><span>共享带宽免费，独享带宽按量</span></div></article><article><ShieldCheck size={19} /><div><b>安全组</b><span>默认拒绝入站，可绑定 4 个规则组</span></div></article></div>
+    </> : <section className="panel table-panel"><div className="table-toolbar"><div><h3>任务列表</h3><span>全部任务 · 默认工作空间</span></div><div className="toolbar-actions"><label className="search-box"><Search size={15} /><input placeholder="搜索任务名称" /></label><button className="outline-button"><CalendarClock size={14} />近 30 天</button><button className="icon-button" title="刷新任务" onClick={() => onNotice("任务状态已刷新")}><RefreshCw size={15} /></button></div></div><div className="responsive-table"><div className="table-row table-head task-table"><span>任务名称</span><span>关联集群</span><span>框架</span><span>任务规格</span><span>副本数</span><span>优先级</span><span>状态</span><span>操作</span></div>{tasks.map(([name, cluster, framework, spec, replicas, priority, taskStatus]) => <div className="table-row task-table" key={name}><div className="instance-name"><strong>{name}</strong><small>创建于 2026-08-08</small></div><span>{cluster}</span><span>{framework}</span><span>{spec}</span><span>{replicas}</span><span>{priority}</span><span className={`status-label ${taskStatus === "运行中" || taskStatus === "已完成" ? "success" : "warning"}`}><i />{taskStatus}</span><button className="outline-button" onClick={() => onNotice(`已打开任务 ${name}`)}>详情</button></div>)}</div></section>}
   </div>;
 }
 
@@ -137,6 +154,7 @@ function InstancesPage({ onRent, onNotice }: ConsoleSectionsProps) {
   };
   return <div className="console-page">
     <PageHeader eyebrow="COMPUTE / INSTANCES" title="实例管理" description="查看服务器状态、网络、镜像与计费信息，并执行日常运维操作。" action="新建实例" onAction={onRent} />
+    <div className="module-tabs"><button className="active">实例列表</button><button onClick={() => onNotice("已打开云助手")}>云助手</button><button onClick={() => onNotice("已打开密钥对管理")}>密钥对</button></div>
     <Metrics items={[
       { label: "实例总数", value: "3", note: "2 个区域", icon: <Server size={18} /> },
       { label: "运行中", value: "2", note: "资源使用正常", icon: <Activity size={18} />, tone: "green" },
@@ -145,6 +163,45 @@ function InstancesPage({ onRent, onNotice }: ConsoleSectionsProps) {
     ]} />
     <section className="panel table-panel"><div className="table-toolbar"><div className="toolbar-actions"><label className="search-box wide-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索名称、实例 ID 或 IP" /></label><label className="select-control"><Filter size={15} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option>全部状态</option><option>运行中</option><option>已停止</option></select><ChevronDown size={14} /></label></div><div className="toolbar-actions"><button className="outline-button"><Download size={14} />导出</button><button className="icon-button" title="刷新列表" onClick={() => onNotice("实例状态已刷新")}><RefreshCw size={15} /></button></div></div><div className="responsive-table"><div className="table-row table-head instance-table"><span>实例名称 / ID</span><span>状态</span><span>区域 / 可用区</span><span>规格与磁盘</span><span>系统镜像</span><span>公网 / 私网 IP</span><span>计费</span><span>操作</span></div>{visible.map((instance) => <div className="table-row instance-table" key={instance.id}><div className="instance-name"><strong>{instance.name}</strong><small>{instance.id}</small></div><span className={`status-label ${instance.status === "运行中" ? "success" : "neutral"}`}><i />{instance.status}</span><span>{instance.region}<small>{instance.zone}</small></span><span>{instance.spec}<small>{instance.disk}</small></span><span>{instance.os}</span><span className="ip-cell"><code>{instance.publicIp}</code><small>{instance.privateIp}</small></span><span>{instance.billing}<small>{instance.price}</small></span><div className="row-menu"><button title="启动或停止" onClick={() => { togglePower(instance.id); onNotice(instance.status === "运行中" ? "实例已停止" : "实例已启动"); }}><Power size={15} /></button><button title="编辑实例" onClick={() => setEditing(instance)}><Edit3 size={15} /></button><button title="更多操作"><MoreHorizontal size={16} /></button></div></div>)}</div></section>
     {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(null)}><section className="edit-dialog" role="dialog" aria-modal="true" aria-label="编辑实例" onMouseDown={(event) => event.stopPropagation()}><div className="dialog-head"><div><span>INSTANCE SETTINGS</span><h3>编辑实例</h3><p>{editing.id}</p></div><button className="icon-button" onClick={() => setEditing(null)} aria-label="关闭"><X size={18} /></button></div><div className="form-grid"><label className="full">实例名称<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /></label><label>计费方式<select value={editing.billing} onChange={(event) => setEditing({ ...editing, billing: event.target.value })}><option>按量计费</option><option>包月</option></select></label><label>系统镜像<select value={editing.os} onChange={(event) => setEditing({ ...editing, os: event.target.value })}><option>Ubuntu 24.04</option><option>Ubuntu 22.04</option><option>PyTorch 2.5</option></select></label><label className="full">实例规格<select value={editing.spec} onChange={(event) => setEditing({ ...editing, spec: event.target.value })}><option>RTX 4090 · 16C 64G</option><option>A100 80G · 24C 180G</option><option>L40S 48G · 20C 96G</option></select></label></div><div className="change-note"><CloudCog size={18} /><span><b>配置变更说明</b>运行中的实例变配需要短暂停机，新配置将在重启后生效。</span></div><div className="dialog-actions"><button className="secondary" onClick={() => setEditing(null)}>取消</button><button className="primary" onClick={saveInstance}>保存变更</button></div></section></div>}
+  </div>;
+}
+
+function ResourceCenterPage({ onNotice }: ConsoleSectionsProps) {
+  const [type, setType] = useState("全部资源类型");
+  const [query, setQuery] = useState("");
+  const resources = [
+    { name: "eip-zhejiangshengwang-b7c74ff5", display: "zjsw_cq02a", type: "弹性公网 IP", zone: "重庆二区 · 可用区 A", group: "default", subscription: "共享订阅", created: "2026-08-03 17:16" },
+    { name: "vpc-zhejiangshengwang-enw25jpr", display: "生产网络", type: "私有网络 VPC", zone: "重庆二区 · 可用区 A", group: "default", subscription: "共享订阅", created: "2026-07-15 11:11" },
+    { name: "ts-zhejiangshengwang-019f63c1", display: "默认监控空间", type: "监控空间", zone: "重庆二区", group: "default", subscription: "共享订阅", created: "2026-07-15 11:12" },
+    { name: "vol-cq02-prod-0291", display: "推理数据盘", type: "块存储", zone: "重庆二区 · 可用区 A", group: "inference", subscription: "生产订阅", created: "2026-08-06 09:28" },
+  ];
+  const visible = resources.filter((item) => (type === "全部资源类型" || item.type === type) && `${item.name}${item.display}`.toLowerCase().includes(query.toLowerCase()));
+  return <div className="console-page">
+    <PageHeader eyebrow="RESOURCE CENTER / INVENTORY" title="资源中心" description="跨产品查看资源、资源组、订阅、标签和授权关系。" action="新建资源组" onAction={() => onNotice("已打开资源组创建流程")} />
+    <div className="module-tabs"><button className="active">资源</button><button onClick={() => onNotice("已打开资源组")}>资源组</button><button onClick={() => onNotice("已打开订阅管理")}>订阅</button><button onClick={() => onNotice("已打开标签管理")}>标签</button><button onClick={() => onNotice("已打开配额管理")}>配额</button></div>
+    <Metrics items={[
+      { label: "资源总数", value: "28", note: "7 种资源类型", icon: <Boxes size={18} /> },
+      { label: "资源组", value: "3", note: "1 个共享资源组", icon: <Layers3 size={18} />, tone: "green" },
+      { label: "订阅", value: "2", note: "全部状态正常", icon: <ReceiptText size={18} />, tone: "orange" },
+      { label: "标签覆盖", value: "86%", note: "4 个资源待补充", icon: <Tag size={18} />, tone: "purple" },
+    ]} />
+    <section className="panel table-panel"><div className="table-toolbar resource-filterbar"><div className="toolbar-actions"><label className="select-control"><Layers3 size={15} /><select><option>全部资源组</option><option>default</option><option>inference</option></select><ChevronDown size={14} /></label><label className="select-control"><Boxes size={15} /><select value={type} onChange={(event) => setType(event.target.value)}><option>全部资源类型</option><option>弹性公网 IP</option><option>私有网络 VPC</option><option>监控空间</option><option>块存储</option></select><ChevronDown size={14} /></label><label className="search-box wide-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="资源名称或显示名称" /></label></div><div className="toolbar-actions"><button className="outline-button" onClick={() => { setType("全部资源类型"); setQuery(""); }}>重置</button><button className="primary compact" onClick={() => onNotice(`已筛选到 ${visible.length} 个资源`)}>筛选</button></div></div><div className="responsive-table"><div className="table-row table-head resource-center-table"><span>资源名称 / 显示名称</span><span>资源类型</span><span>地区 / 可用区</span><span>资源组</span><span>订阅</span><span>标签</span><span>创建时间</span><span>操作</span></div>{visible.map((item) => <div className="table-row resource-center-table" key={item.name}><div className="instance-name"><strong>{item.display}</strong><small>{item.name}</small></div><span>{item.type}</span><span>{item.zone}</span><span>{item.group}</span><span>{item.subscription}</span><span className="tag-cell"><Tag size={13} />production</span><span>{item.created}</span><button className="outline-button" onClick={() => onNotice(`已打开 ${item.display} 授权设置`)}>授权</button></div>)}</div></section>
+  </div>;
+}
+
+function MonitorPage({ onNotice }: ConsoleSectionsProps) {
+  const [range, setRange] = useState("24 小时");
+  return <div className="console-page">
+    <PageHeader eyebrow="OBSERVABILITY / CLOUD MONITOR" title="云监控" description="集中查看资源指标、告警趋势、事件和日志状态。" action="创建告警规则" onAction={() => onNotice("已打开告警规则创建流程")} />
+    <div className="module-tabs"><button className="active">概览</button><button onClick={() => onNotice("已打开云产品监控")}>云产品监控</button><button onClick={() => onNotice("已打开监控仪表盘")}>仪表盘</button><button onClick={() => onNotice("已打开事件监控")}>事件</button><button onClick={() => onNotice("已打开日志服务")}>日志</button></div>
+    <Metrics items={[
+      { label: "紧急告警", value: "0", note: "近 24 小时", icon: <TriangleAlert size={18} /> },
+      { label: "重要告警", value: "0", note: "近 24 小时", icon: <Bell size={18} />, tone: "orange" },
+      { label: "监控资源", value: "28", note: "全部采集正常", icon: <Activity size={18} />, tone: "green" },
+      { label: "告警规则", value: "12", note: "10 个已启用", icon: <ShieldCheck size={18} />, tone: "purple" },
+    ]} />
+    <div className="console-split monitor-overview"><section className="panel monitor-chart"><div className="panel-title"><div><h3>告警趋势</h3><p>{range}内按等级汇总</p></div><div className="segmented small">{["24 小时", "7 天", "30 天"].map((item) => <button key={item} className={range === item ? "active" : ""} onClick={() => setRange(item)}>{item}</button>)}</div></div><div className="monitor-bars">{[12,18,9,22,14,17,11,8,16,10,7,13].map((height, index) => <i key={index} style={{ height: `${height + 12}%` }} />)}</div><div className="monitor-axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>现在</span></div></section><section className="panel monitor-health"><div className="panel-title"><div><h3>采集健康度</h3><p>实时监控链路</p></div></div><div className="health-score"><strong>99.99%</strong><span>数据采集成功率</span></div><div className="health-items"><span><i />指标采集 <b>正常</b></span><span><i />事件通道 <b>正常</b></span><span><i />通知通道 <b>正常</b></span></div></section></div>
+    <section className="panel table-panel"><div className="table-toolbar"><div><h3>近 24 小时告警历史</h3><span>当前没有未恢复告警</span></div><div className="toolbar-actions"><button className="outline-button"><Filter size={14} />全部等级</button><button className="icon-button" title="刷新告警" onClick={() => onNotice("告警数据已刷新")}><RefreshCw size={15} /></button></div></div><div className="monitor-empty"><ShieldCheck size={34} /><h3>所有资源运行正常</h3><p>当前筛选范围内没有告警记录。</p><button className="text-button" onClick={() => onNotice("已打开告警规则")}>查看告警规则</button></div></section>
   </div>;
 }
 
@@ -159,6 +216,8 @@ function BillingPage({ balance, onCharge, onNotice }: ConsoleSectionsProps) {
   ];
   return <div className="console-page">
     <PageHeader eyebrow="FINANCE / BILLING" title="用量与账单" description="按产品、资源和时间查看成本，跟踪余额与预算执行情况。" action="充值 USDT" onAction={onCharge} />
+    <div className="module-tabs"><button className="active">费用总览</button><button onClick={() => onNotice("已打开账户管理")}>账户管理</button><button onClick={() => onNotice("已打开订单管理")}>订单管理</button><button onClick={() => onNotice("已打开账单管理")}>账单管理</button><button onClick={() => onNotice("已打开成本分析")}>成本分析</button></div>
+    <div className="billing-account-grid"><section className="panel account-summary"><div className="panel-title"><div><h3>账户信息</h3><p>默认计费账户 · 关联 1 个订阅</p></div><button className="text-button" onClick={() => onNotice("已打开账户详情")}>查看详情</button></div><div className="account-balance"><div><span>可用余额</span><strong>{balance.toFixed(2)} <small>USDT</small></strong></div><button className="primary compact" onClick={onCharge}>充值</button></div><div className="balance-alert"><span><Bell size={14} />余额预警</span><b>低于 200 USDT 时通知</b><button className="text-button" onClick={() => onNotice("已打开余额预警设置")}>修改</button></div></section><section className="panel renewal-summary"><div className="panel-title"><div><h3>待续费资源</h3><p>1 个资源已超期</p></div><button className="text-button" onClick={() => onNotice("已打开续费管理")}>查看更多</button></div><div className="renewal-row"><div><strong>eip-zhejiangshengwang-b7c74ff5</strong><span>弹性公网 IP · 重庆二区 A</span></div><b>超期 3 天</b><button className="outline-button" onClick={() => onNotice("已打开续费确认")}>续订</button></div></section></div>
     <Metrics items={[
       { label: "可用余额", value: `${balance.toFixed(2)} USDT`, note: "预计可用 36 天", icon: <CircleDollarSign size={18} />, tone: "green" },
       { label: "本月消费", value: "$186.42", note: "较上月 +8.2%", icon: <ReceiptText size={18} /> },
