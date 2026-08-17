@@ -8,6 +8,24 @@
   overflow-x: auto;
 }
 
+.order-filter-panel { padding: 16px; margin-bottom: 15px; }
+.order-filter-grid { display: grid; grid-template-columns: minmax(240px, 1.5fr) minmax(170px, .7fr) auto auto; align-items: end; gap: 10px; }
+.order-filter-grid label { display: flex; flex-direction: column; gap: 7px; color: #60778b; font-size: 10px; }
+.order-filter-grid input, .order-filter-grid select { height: 35px; border: 1px solid #cfdee9; border-radius: 6px; background: #fff; color: #31546d; padding: 0 10px; font-size: 11px; }
+.orders-table { grid-template-columns: minmax(190px, 1.15fr) minmax(170px, 1fr) minmax(140px, .8fr) .5fr .65fr minmax(190px, 1.1fr) .55fr .65fr 74px; min-width: 1250px; }
+.orders-table > code { color: #286582; font-size: 9px; }
+.orders-table > span > small { display: block; margin-top: 4px; }
+.order-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; margin-top: 14px; }
+.order-detail-grid > div { display: flex; flex-direction: column; gap: 5px; border-bottom: 1px solid #e6edf2; padding: 13px 0; }
+.order-detail-grid span { color: #7b8d9b; font-size: 9px; }
+.order-detail-grid b { color: #34566d; font-size: 11px; }
+.order-detail-dialog { width: min(680px, 100%); }
+
+@media (max-width: 760px) {
+  .order-filter-grid, .order-detail-grid { grid-template-columns: 1fr; }
+  .order-filter-grid button { width: 100%; }
+}
+
 .module-tabs button {
   align-self: stretch;
   flex: 0 0 auto;

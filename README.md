@@ -1,137 +1,54 @@
-# vinext-starter
+# HEXBIT 云计算管理控制台
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+基于 React、TypeScript、Vite、React Router、Go 和 MySQL 的可操作云控制台。应用直接进入控制台，实例、订单、网络、存储、用户、密钥、告警和账单均通过 Go API 持久化到 MySQL。
 
-## Prerequisites
+## 本地运行
 
-- Node.js `>=22.13.0`
-
-## Quick Start
+要求 Node.js `>=22.13.0`。
 
 ```bash
 npm install
 npm run dev
-npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+默认访问地址：`http://localhost:5173`。
 
+前端默认连接 `http://127.0.0.1:18080/api/v1`，可通过 `VITE_API_BASE_URL` 修改。开发控制台自动使用测试账号 `admin` / `admin` 建立后端会话。
 
+## 页面路由
 
+- `/` 控制台首页
+- `/compute` 云服务器产品
+- `/instances/new` 创建云服务器
+- `/instances` 实例管理
+- `/instances/:instanceId` 实例详情
+- `/network` 网络、子网、公网 IP 与安全组
+- `/storage` 云盘管理
+- `/resources` 资源组、标签、订阅与配额
+- `/monitoring` 云监控与告警
+- `/billing` 订单、账单、充值与成本分析
+- `/users` 用户与权限
+- `/api-keys` API 密钥
+- `/help` 帮助中心
 
-## Included Shape
+## 数据与安全
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+业务状态由 `src/store.tsx` 通过 `/api/v1/console/state` 读写 MySQL 的 `console_states` 表。每次写入携带 revision 执行乐观锁检查，数据库提交成功后前端才更新；冲突时重新加载数据库版本。每次成功写入还会在同一事务中向 `console_state_changes` 写入操作名称、revision 和状态 SHA-256，用于核对所有菜单的 CRUD 是否真正落库。
 
-## Workspace Auth Headers
+LocalStorage 仅保存后端访问令牌，不保存业务数据。API Key Secret 只在创建结果弹窗中完整显示一次，数据库状态只保留脱敏提示。实例登录密码仅用于前端校验，不会写入数据库。
 
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
+左侧“恢复初始数据”会在二次确认后覆盖当前账号的数据库状态。
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
-```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
-# AetherCPU 前端原型
-
-## 自动构建与打包
-
-在项目目录中运行：
+## 检查命令
 
 ```bash
-npm run deploy
+npm run build
+npm run lint
+npm test
+npx tsc --noEmit --incremental false
 ```
 
-该命令会先构建前端，再生成可交付的部署包：
-
-```text
-release/aethercpu-deploy.tar.gz
-```
-
-此包只包含静态前端资源：`index.html`、CSS、JavaScript 和图片，可直接部署到 Nginx。
-
-## GitHub 自动部署
-
-推送到 `main` 后，GitHub Actions 会自动安装依赖、构建静态 `dist`、压缩并通过 SSH 部署到服务器。首次启用前，在仓库的 **Settings → Secrets and variables → Actions** 配置：
-
-| 类型 | 名称 | 内容 |
-| --- | --- | --- |
-| Variable | `DEPLOY_HOST` | 服务器域名或 IP |
-| Variable | `DEPLOY_SSH_PORT` | SSH 端口，默认 `22` |
-| Variable | `DEPLOY_TARGET_DIR` | 部署目录，例如 `/var/www/hexbit-front` |
-| Secret | `DEPLOY_SSH_USER` | 服务器 SSH 用户名 |
-| Secret | `DEPLOY_SSH_PRIVATE_KEY` | 对应用户的私钥全文 |
-
-部署工作流先在服务器临时目录解压并校验，再切换到目标目录；旧版本只会在新版本就绪后删除。
-
-Nginx 的站点根目录直接指向 `DEPLOY_TARGET_DIR`；单页应用需要回退到 `index.html`：
+生产环境部署为标准 Vite SPA，Web 服务器需要将未知路由回退到 `index.html`：
 
 ```nginx
 location / {

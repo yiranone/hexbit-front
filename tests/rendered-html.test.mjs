@@ -11,7 +11,7 @@ function assetUrlFrom(html, pattern, kind) {
   return new URL(match[1].slice(1), distRoot);
 }
 
-test("builds the AetherCPU Vite SPA shell", async () => {
+test("builds the HEXBIT cloud console SPA shell", async () => {
   const html = await readFile(new URL("index.html", distRoot), "utf8");
 
   assert.match(html, /<!doctype html>/i);
@@ -19,9 +19,9 @@ test("builds the AetherCPU Vite SPA shell", async () => {
   assert.match(html, /<meta\s+name=["']viewport["'][^>]*>/i);
   assert.match(
     html,
-    /<meta\s+name=["']description["']\s+content=["']AetherCPU 弹性算力平台前端原型["'][^>]*>/i,
+    /<meta\s+name=["']description["']\s+content=["']HEXBIT 云计算管理控制台["'][^>]*>/i,
   );
-  assert.match(html, /<title>AetherCPU · 弹性算力平台<\/title>/i);
+  assert.match(html, /<title>HEXBIT 云控制台<\/title>/i);
   assert.match(html, /<div\s+id=["']root["']><\/div>/i);
   assert.doesNotMatch(html, /\/src\/main\.tsx/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);
@@ -51,7 +51,10 @@ test("emits loadable JavaScript and CSS assets for the current console", async (
   assert.ok(stylesheetStats.size > 0, "stylesheet bundle should not be empty");
   assert.match(script, /getElementById\([`"']root[`"']\)/);
   assert.match(script, /控制台/);
-  assert.match(script, /创建资源/);
-  assert.match(stylesheet, /\.dashboard/);
-  assert.match(stylesheet, /\.console-home/);
+  assert.match(script, /创建云服务器/);
+  assert.match(script, /\/console\/state/);
+  assert.doesNotMatch(script, /hexbit-console-v3/);
+  assert.match(stylesheet, /\.console-shell/);
+  assert.match(stylesheet, /\.sidebar/);
+  assert.match(stylesheet, /\.table-scroll/);
 });

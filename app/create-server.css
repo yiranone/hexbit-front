@@ -17,6 +17,8 @@
 .config-label { color: #526b7d; font-size: 10px; font-weight: 700; }
 .config-fields { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
 .config-fields > small { color: #8997a2; font-size: 8px; }
+.spec-fields { width: 100%; }
+.purchase-status { width: 100%; border: 1px solid #dce8ef; border-radius: 5px; background: #f7fbfd; color: #587489; padding: 14px; font-size: 10px; }
 .inline-fields { width: min(640px, 100%); display: grid; grid-template-columns: 1fr 1.35fr; gap: 8px; }
 .config-fields select, .config-row > select, .credential-grid input, .stacked-field select, .text-control {
   height: 36px;
@@ -107,14 +109,39 @@
 .agreement-line { align-items: flex-start; padding: 14px 16px 8px; line-height: 1.45; }
 .agreement-line input { flex: 0 0 auto; margin-top: 1px; }
 .purchase-warning { margin: 5px 16px 0; border-radius: 4px; background: #fff4e8; color: #aa661f; padding: 8px; font-size: 8px; }
+.purchase-error { margin: 8px 16px 0; border: 1px solid #f0c9c2; border-radius: 4px; background: #fff4f2; color: #a84737; padding: 9px; font-size: 9px; line-height: 1.5; }
+.spec-fields > .purchase-error { width: 100%; margin: 0; }
+.purchase-error button { margin-left: 8px; border: 0; background: none; color: #176fa2; padding: 0; font-weight: 700; }
 .purchase-button { width: calc(100% - 32px); display: flex; align-items: center; justify-content: center; gap: 7px; margin: 12px 16px 16px; border-radius: 5px; box-shadow: none; }
 .purchase-button:disabled { background: #b8c7d1; box-shadow: none; cursor: not-allowed; }
+.order-confirm-page { max-width: 1180px; color: #20384c; }
+.order-confirm-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; gap: 14px; }
+.order-confirm-card > header { justify-content: flex-start; }
+.order-confirm-card > header .order-status { margin-left: auto; }
+.order-status { display: inline-flex; align-items: center; border-radius: 4px; padding: 5px 8px; font-size: 9px; font-weight: 700; }
+.order-status.pending { background: #fff2d9; color: #a96818; }
+.order-status.success { background: #e5f7ee; color: #18805c; }
+.order-confirm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 30px; padding: 20px; }
+.order-confirm-grid .summary-line { grid-template-columns: 105px minmax(0, 1fr); margin: 0; border-bottom: 1px solid #edf1f4; padding: 10px 0; }
+.order-payment-card { border: 1px solid #dbe5ec; border-radius: 6px; background: #fff; padding: 18px; }
+.order-payment-card h3 { margin: 0 0 15px; font-size: 14px; }
+.payment-method { display: flex; align-items: center; gap: 10px; border: 1px solid #62a9d5; border-radius: 5px; background: #eef8fe; padding: 13px; }
+.payment-method > div { display: flex; flex-direction: column; gap: 4px; }
+.payment-method b { font-size: 11px; }
+.payment-method small { color: #748a99; font-size: 9px; }
+.order-amount { display: grid; grid-template-columns: 1fr auto; gap: 12px; border-top: 1px solid #e4ebf0; margin-top: 16px; padding-top: 16px; font-size: 10px; }
+.order-amount span { color: #738594; }
+.order-amount b { color: #405f74; text-align: right; }
+.order-amount strong { border-top: 1px solid #e4ebf0; padding-top: 13px; }
+.order-amount em { border-top: 1px solid #e4ebf0; color: #dc5e45; padding-top: 10px; font-size: 18px; font-style: normal; font-weight: 700; }
+.order-payment-card .purchase-button { width: 100%; margin: 16px 0 0; }
 
 @media (max-width: 1120px) {
   .server-create-layout { grid-template-columns: 1fr; }
   .purchase-summary { position: static; max-height: none; overflow: visible; }
   .summary-block { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
   .summary-block h3 { grid-column: 1 / -1; }
+  .order-confirm-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -127,4 +154,5 @@
   .account-share { justify-content: space-between; gap: 20px; }
   .summary-block { grid-template-columns: 1fr; }
   .summary-block h3 { grid-column: auto; }
+  .order-confirm-grid { grid-template-columns: 1fr; }
 }

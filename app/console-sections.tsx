@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CreateServerPage, type ServerCreateRequest } from "./create-server";
+import { api, type ApiOffering, type ApiOrder, type ApiResourceGroup } from "../src/api";
 import {
   Activity,
   Bell,
@@ -39,6 +40,7 @@ import {
 
 type ConsoleSectionsProps = {
   section: string;
+  accountName: string;
   balance: number;
   onRent: () => void;
   onCharge: () => void;
@@ -47,7 +49,11 @@ type ConsoleSectionsProps = {
   onCreateServerHandled?: () => void;
   instances: Instance[];
   setInstances: React.Dispatch<React.SetStateAction<Instance[]>>;
-  onServerCreated: (request: ServerCreateRequest) => void;
+  onOrderCreated: (request: ServerCreateRequest) => Promise<ApiOrder>;
+  onOrderPaid: (order: ApiOrder) => Promise<void>;
+  onInstanceAction: (id: string, action: "start" | "stop") => Promise<void>;
+  onInstanceUpdate: (id: string, input: { name?: string; auto_renew?: boolean }) => Promise<void>;
+  onInstanceDelete: (id: string) => Promise<void>;
 };
 
 export type Instance = {
@@ -74,13 +80,6 @@ const modelRows = [
   { mark: "D", name: "DeepSeek-V3.1", provider: "DeepSeek", type: "推理增强", context: "128K", input: "$0.14", output: "$0.56", latency: "536 ms", status: "稳定" },
   { mark: "G", name: "GLM-4.7", provider: "Zhipu AI", type: "工具调用", context: "128K", input: "$0.22", output: "$0.88", latency: "468 ms", status: "稳定" },
   { mark: "K", name: "Kimi-K2-Instruct", provider: "Moonshot", type: "文本生成", context: "256K", input: "$0.20", output: "$0.80", latency: "621 ms", status: "繁忙" },
-];
-
-const gpuRows = [
-  { name: "NVIDIA H100 SXM", vram: "80 GB HBM3", compute: "26 vCPU · 200 GB", region: "Singapore · A", stock: 6, ondemand: "$2.596", monthly: "$1.97", saving: "省 24%" },
-  { name: "NVIDIA A100 SXM", vram: "80 GB HBM2e", compute: "24 vCPU · 180 GB", region: "Hong Kong · B", stock: 11, ondemand: "$0.960", monthly: "$0.78", saving: "省 19%" },
-  { name: "NVIDIA RTX 4090", vram: "24 GB GDDR6X", compute: "16 vCPU · 64 GB", region: "Singapore · C", stock: 18, ondemand: "$0.420", monthly: "$0.34", saving: "省 20%" },
-  { name: "NVIDIA L40S", vram: "48 GB GDDR6", compute: "20 vCPU · 96 GB", region: "Tokyo · A", stock: 4, ondemand: "$0.720", monthly: "$0.59", saving: "省 18%" },
 ];
 
 export const initialInstances: Instance[] = [
@@ -113,6 +112,7 @@ export function ConsoleSections(props: ConsoleSectionsProps) {
   if (props.section === "资源中心") return <ResourceCenterPage {...props} />;
   if (props.section === "云监控") return <MonitorPage {...props} />;
   if (props.section === "用量与账单") return <BillingPage {...props} />;
+  if (props.section === "订单管理") return <OrdersPage {...props} />;
   if (props.section === "用户与权限") return <UsersPage onNotice={props.onNotice} />;
   if (props.section === "账号中心") return <AccountCenterPage onNotice={props.onNotice} />;
   if (props.section === "消息中心") return <MessageCenterPage />;
@@ -120,8 +120,8 @@ export function ConsoleSections(props: ConsoleSectionsProps) {
   return <KeysPage {...props} />;
 }
 
-function PageHeader({ eyebrow, title, description, action, onAction }: { eyebrow: string; title: string; description: string; action: string; onAction: () => void }) {
-  return <div className="console-page-head"><div><span>{eyebrow}</span><h2>{title}</h2><p>{description}</p></div><button className="primary" onClick={onAction}><Plus size={16} />{action}</button></div>;
+function PageHeader({ eyebrow, title, description, action, onAction }: { eyebrow: string; title: string; description: string; action?: string; onAction?: () => void }) {
+  return <div className="console-page-head"><div><span>{eyebrow}</span><h2>{title}</h2><p>{description}</p></div>{action && onAction && <button className="primary" onClick={onAction}><Plus size={16} />{action}</button>}</div>;
 }
 
 function Metrics({ items }: { items: Array<{ label: string; value: string; note: string; icon: React.ReactNode; tone?: string }> }) {
@@ -163,45 +163,126 @@ function ModelsPage({ onNotice }: ConsoleSectionsProps) {
   </div>;
 }
 
-function GpuPage({ onNotice, createServerRequest, onCreateServerHandled, onServerCreated }: ConsoleSectionsProps) {
+function GpuPage({ accountName, balance, onCharge, onNotice, createServerRequest, onCreateServerHandled, onOrderCreated, onOrderPaid }: ConsoleSectionsProps) {
   const [billing, setBilling] = useState("按量计费");
   const [region, setRegion] = useState("全部区域");
   const [mode, setMode] = useState(createServerRequest ? "创建服务器" : "GPU 资源池");
+  const [selectedOfferingId, setSelectedOfferingId] = useState<string>();
+  const [gpuOfferings, setGpuOfferings] = useState<ApiOffering[]>([]);
+  const [resourceGroups, setResourceGroups] = useState<ApiResourceGroup[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
   const [gpuFilterOpen, setGpuFilterOpen] = useState(false);
   const [gpuFamily, setGpuFamily] = useState("全部 GPU");
   const [minimumStock, setMinimumStock] = useState("不限库存");
   const [taskRange, setTaskRange] = useState("近 30 天");
   const [taskQuery, setTaskQuery] = useState("");
+  const loadCatalog = useCallback(() => {
+    setCatalogLoading(true);
+    setCatalogError("");
+    Promise.all([api.offerings("gpu"), api.resourceGroups()])
+      .then(([offerings, groups]) => {
+        setGpuOfferings(offerings ?? []);
+        setResourceGroups(groups ?? []);
+      })
+      .catch((error) => setCatalogError(error instanceof Error ? error.message : "GPU 产品数据加载失败"))
+      .finally(() => setCatalogLoading(false));
+  }, []);
+  useEffect(() => {
+    Promise.all([api.offerings("gpu"), api.resourceGroups()])
+      .then(([offerings, groups]) => {
+        setGpuOfferings(offerings ?? []);
+        setResourceGroups(groups ?? []);
+      })
+      .catch((error) => setCatalogError(error instanceof Error ? error.message : "GPU 产品数据加载失败"))
+      .finally(() => setCatalogLoading(false));
+  }, []);
+  const regions = useMemo(() => Array.from(new Set(gpuOfferings.map((item) => item.region))), [gpuOfferings]);
+  const inventory = useMemo(() => gpuOfferings.reduce((sum, item) => sum + item.stock * Math.max(item.gpu_count, 1), 0), [gpuOfferings]);
   const tasks = [
     ["qwen-finetune-v4", "train-cluster-01", "PyTorch", "A100 80G x 4", "4", "高", "运行中"],
     ["embedding-batch-0821", "inference-pool", "Ray", "L40S 48G x 2", "8", "中", "排队中"],
     ["vision-eval", "dev-cluster", "PyTorch", "RTX 4090 x 1", "1", "普通", "已完成"],
   ];
-  if (mode === "创建服务器") return <CreateServerPage onBack={() => { setMode("GPU 资源池"); onCreateServerHandled?.(); }} onNotice={onNotice} onSubmit={onServerCreated} />;
+  if (mode === "创建服务器") return <CreateServerPage accountName={accountName} balance={balance} offerings={gpuOfferings} resourceGroups={resourceGroups} initialOfferingId={selectedOfferingId} loading={catalogLoading} loadError={catalogError} onBack={() => { setMode("GPU 资源池"); onCreateServerHandled?.(); }} onCharge={onCharge} onReload={loadCatalog} onCreateOrder={onOrderCreated} onPayOrder={onOrderPaid} />;
   return <div className="console-page">
     <PageHeader eyebrow="COMPUTE / GPU MARKET" title="GPU 服务器" description="按工作负载选择 GPU，支持虚拟机、裸金属和竞价实例。" action="创建服务器" onAction={() => setMode("创建服务器")} />
     <div className="module-tabs">{["GPU 资源池", "算力任务"].map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}</div>
     {mode === "GPU 资源池" ? <>
-      <div className="availability-strip"><span><Zap size={18} />实时库存</span><div><b>39</b> 张 GPU 可立即部署</div><small>库存更新于 12 秒前</small><button className="icon-button" title="刷新库存" onClick={() => onNotice("库存已刷新")}><RefreshCw size={15} /></button></div>
-      <section className="panel table-panel"><div className="table-toolbar gpu-toolbar"><div className="segmented">{["按量计费", "包月", "竞价实例"].map((item) => <button key={item} className={billing === item ? "active" : ""} onClick={() => setBilling(item)}>{item}</button>)}</div><div className="toolbar-actions"><label className="select-control"><Network size={15} /><select value={region} onChange={(event) => setRegion(event.target.value)}><option>全部区域</option><option>Singapore</option><option>Hong Kong</option><option>Tokyo</option></select><ChevronDown size={14} /></label><button className="outline-button" onClick={() => setGpuFilterOpen((open) => !open)}><Filter size={14} />{gpuFilterOpen ? "收起筛选" : "更多筛选"}</button></div></div>{gpuFilterOpen && <div className="advanced-filter-strip"><label>GPU 型号<select value={gpuFamily} onChange={(event) => setGpuFamily(event.target.value)}><option>全部 GPU</option><option>H100</option><option>A100</option><option>RTX 4090</option><option>L40S</option></select></label><label>最低库存<select value={minimumStock} onChange={(event) => setMinimumStock(event.target.value)}><option>不限库存</option><option>至少 5 张</option><option>至少 10 张</option></select></label><button className="text-button" onClick={() => { setGpuFamily("全部 GPU"); setMinimumStock("不限库存"); }}>重置筛选</button></div>}<div className="responsive-table"><div className="table-row table-head gpu-table"><span>GPU 型号</span><span>计算配置</span><span>区域 / 可用区</span><span>库存</span><span>{billing === "包月" ? "包月单价" : "按量单价"}</span><span>长期价格</span><span /></div>{gpuRows.filter((gpu) => (region === "全部区域" || gpu.region.startsWith(region)) && (gpuFamily === "全部 GPU" || gpu.name.includes(gpuFamily)) && (minimumStock === "不限库存" || gpu.stock >= Number(minimumStock.match(/\d+/)?.[0] ?? 0))).map((gpu) => <div className="table-row gpu-table" key={gpu.name}><div className="gpu-name"><span className="gpu-mark">GPU</span><span><strong>{gpu.name}</strong><small>{gpu.vram}</small></span></div><span>{gpu.compute}</span><span>{gpu.region}</span><span className="stock"><i />{gpu.stock} 可用</span><strong>{billing === "包月" ? gpu.monthly : gpu.ondemand}<small> / GPU / 时</small></strong><span>{gpu.monthly}<small className="saving">{gpu.saving}</small></span><button className="primary compact" onClick={() => setMode("创建服务器")}>部署</button></div>)}</div></section>
+      <div className="availability-strip"><span><Zap size={18} />实时库存</span><div><b>{inventory}</b> 张 GPU 可立即部署</div><small>{catalogLoading ? "正在查询后台" : "数据来自产品目录"}</small><button className="icon-button" title="刷新库存" onClick={() => { loadCatalog(); onNotice("正在刷新库存"); }}><RefreshCw size={15} /></button></div>
+      <section className="panel table-panel"><div className="table-toolbar gpu-toolbar"><div className="segmented">{["按量计费", "包月"].map((item) => <button key={item} className={billing === item ? "active" : ""} onClick={() => setBilling(item)}>{item}</button>)}</div><div className="toolbar-actions"><label className="select-control"><Network size={15} /><select value={region} onChange={(event) => setRegion(event.target.value)}><option>全部区域</option>{regions.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown size={14} /></label><button className="outline-button" onClick={() => setGpuFilterOpen((open) => !open)}><Filter size={14} />{gpuFilterOpen ? "收起筛选" : "更多筛选"}</button></div></div>{gpuFilterOpen && <div className="advanced-filter-strip"><label>GPU 型号<select value={gpuFamily} onChange={(event) => setGpuFamily(event.target.value)}><option>全部 GPU</option>{Array.from(new Set(gpuOfferings.map((item) => item.gpu_model ?? item.name))).map((item) => <option key={item}>{item}</option>)}</select></label><label>最低库存<select value={minimumStock} onChange={(event) => setMinimumStock(event.target.value)}><option>不限库存</option><option>至少 5 张</option><option>至少 10 张</option></select></label><button className="text-button" onClick={() => { setGpuFamily("全部 GPU"); setMinimumStock("不限库存"); }}>重置筛选</button></div>}{catalogError && <div className="purchase-error">{catalogError}<button onClick={loadCatalog}>重新加载</button></div>}<div className="responsive-table"><div className="table-row table-head gpu-table"><span>GPU 型号</span><span>计算配置</span><span>区域 / 可用区</span><span>库存</span><span>{billing === "包月" ? "包月单价" : "按量单价"}</span><span>规格编码</span><span /></div>{gpuOfferings.filter((gpu) => (region === "全部区域" || gpu.region === region) && (gpuFamily === "全部 GPU" || (gpu.gpu_model ?? gpu.name) === gpuFamily) && (minimumStock === "不限库存" || gpu.stock >= Number(minimumStock.match(/\d+/)?.[0] ?? 0))).map((gpu) => <div className="table-row gpu-table" key={gpu.id}><div className="gpu-name"><span className="gpu-mark">GPU</span><span><strong>{gpu.name}</strong><small>{gpu.gpu_memory_gib} GB 显存</small></span></div><span>{gpu.vcpu} vCPU · {gpu.memory_gib} GB</span><span>{gpu.region} · {gpu.zone}</span><span className="stock"><i />{gpu.stock} 可用</span><strong>{gpu.currency} {(billing === "包月" ? gpu.price_monthly : gpu.price_hourly)?.toFixed(3)}<small> / {billing === "包月" ? "月" : "时"}</small></strong><span>{gpu.id}<small>{gpu.gpu_count} 卡 / 台</small></span><button className="primary compact" disabled={gpu.stock === 0 || (billing === "包月" ? !gpu.price_monthly : !gpu.price_hourly)} onClick={() => { setSelectedOfferingId(gpu.id); setMode("创建服务器"); }}>部署</button></div>)}</div></section>
       <div className="resource-notes"><article><HardDrive size={19} /><div><b>块存储</b><span>从 $0.0002 / GiB / 小时</span></div></article><article><Network size={19} /><div><b>公网与 VPC</b><span>共享带宽免费，独享带宽按量</span></div></article><article><ShieldCheck size={19} /><div><b>安全组</b><span>默认拒绝入站，可绑定 4 个规则组</span></div></article></div>
     </> : <section className="panel table-panel"><div className="table-toolbar"><div><h3>任务列表</h3><span>{taskRange} · 默认工作空间</span></div><div className="toolbar-actions"><label className="search-box"><Search size={15} /><input value={taskQuery} onChange={(event) => setTaskQuery(event.target.value)} placeholder="搜索任务名称" /></label><label className="select-control"><CalendarClock size={14} /><select value={taskRange} onChange={(event) => setTaskRange(event.target.value)}><option>近 7 天</option><option>近 30 天</option><option>近 90 天</option></select><ChevronDown size={14} /></label><button className="icon-button" title="刷新任务" onClick={() => onNotice("任务状态已刷新")}><RefreshCw size={15} /></button></div></div><div className="responsive-table"><div className="table-row table-head task-table"><span>任务名称</span><span>关联集群</span><span>框架</span><span>任务规格</span><span>副本数</span><span>优先级</span><span>状态</span><span>操作</span></div>{tasks.filter(([name]) => name.toLowerCase().includes(taskQuery.toLowerCase())).map(([name, cluster, framework, spec, replicas, priority, taskStatus]) => <div className="table-row task-table" key={name}><div className="instance-name"><strong>{name}</strong><small>创建于 2026-08-08</small></div><span>{cluster}</span><span>{framework}</span><span>{spec}</span><span>{replicas}</span><span>{priority}</span><span className={`status-label ${taskStatus === "运行中" || taskStatus === "已完成" ? "success" : "warning"}`}><i />{taskStatus}</span><button className="outline-button" onClick={() => onNotice(`已打开任务 ${name}`)}>详情</button></div>)}</div></section>}
   </div>;
 }
 
-function InstancesPage({ onRent, onNotice, instances, setInstances }: ConsoleSectionsProps) {
+const orderStatusLabels: Record<ApiOrder["status"], string> = {
+  pending_payment: "待支付",
+  processing: "创建中",
+  successful: "交易成功",
+  payment_failed: "支付失败",
+  creation_failed: "创建失败",
+  cancelled: "已取消",
+};
+
+function OrdersPage({ onNotice, onOrderPaid }: ConsoleSectionsProps) {
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<ApiOrder | null>(null);
+  const loadOrders = useCallback(() => {
+    setLoading(true);
+    setError("");
+    api.orders(status, query).then(setOrders).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "订单加载失败")).finally(() => setLoading(false));
+  }, [query, status]);
+  useEffect(() => {
+    api.orders().then(setOrders).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "订单加载失败")).finally(() => setLoading(false));
+  }, []);
+  const pay = async (order: ApiOrder) => {
+    try {
+      await onOrderPaid(order);
+    } catch (payError) {
+      onNotice(payError instanceof Error ? payError.message : "订单支付失败");
+    }
+  };
+  return <div className="console-page">
+    <PageHeader eyebrow="BILLING / ORDERS" title="我的订单" description="查询新购、续订和退订订单，跟踪支付与资源创建状态。" />
+    <section className="panel order-filter-panel"><div className="order-filter-grid"><label>订单编号或资源名称<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入订单号、资源名或规格" /></label><label>订单状态<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">全部状态</option>{Object.entries(orderStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="primary compact" onClick={loadOrders}>搜索</button><button className="outline-button" onClick={() => { setQuery(""); setStatus(""); api.orders().then(setOrders); }}>重置</button></div></section>
+    <section className="panel table-panel"><div className="table-toolbar"><div><h3>订单列表</h3><span>{loading ? "正在查询" : `${orders.length} 条订单`}</span></div><button className="icon-button" title="刷新订单" onClick={loadOrders}><RefreshCw size={15} /></button></div>{error && <div className="purchase-error">{error}</div>}<div className="responsive-table"><div className="table-row table-head orders-table"><span>订单号</span><span>资源名称 / 规格</span><span>地区和可用区</span><span>订单类型</span><span>订单状态</span><span>创建 / 支付时间</span><span>支付方式</span><span>最终价格</span><span>操作</span></div>{orders.map((order) => <div className="table-row orders-table" key={order.id}><code>{order.id}</code><div className="instance-name"><strong>{order.resource_name}</strong><small>{order.offering_name} · {order.quantity} 台</small></div><span>{order.region}<small>{order.zone}</small></span><span>{order.type === "purchase" ? "新购" : order.type === "renewal" ? "续订" : "退订"}</span><span className={`status-label ${order.status === "successful" ? "success" : order.status === "pending_payment" ? "warning" : "neutral"}`}><i />{orderStatusLabels[order.status]}</span><span>{new Date(order.created_at).toLocaleString("zh-CN")}<small>{order.paid_at ? `支付 ${new Date(order.paid_at).toLocaleString("zh-CN")}` : "尚未支付"}</small></span><span>{order.payment_method === "balance" ? "余额支付" : "-"}</span><strong>{order.currency} {order.final_amount.toFixed(2)}</strong><div className="row-menu"><button title="订单详情" onClick={() => setSelected(order)}><Clipboard size={14} /></button>{order.status === "pending_payment" && <button title="立即支付" onClick={() => pay(order)}><CircleDollarSign size={14} /></button>}</div></div>)}</div></section>
+    {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><section className="edit-dialog order-detail-dialog" role="dialog" aria-modal="true" aria-label="订单详情" onMouseDown={(event) => event.stopPropagation()}><div className="dialog-head"><div><span>ORDER DETAIL</span><h3>订单详情</h3><p>{selected.id}</p></div><button className="icon-button" aria-label="关闭订单详情" onClick={() => setSelected(null)}><X size={16} /></button></div><div className="order-detail-grid"><SummaryValue label="资源名称" value={selected.resource_name} /><SummaryValue label="产品规格" value={`${selected.offering_name} / ${selected.offering_id}`} /><SummaryValue label="地区和可用区" value={`${selected.region} / ${selected.zone}`} /><SummaryValue label="计费模式" value={selected.billing_mode === "monthly" ? `包月 ${selected.duration} 个月` : `按量 ${selected.duration} 小时`} /><SummaryValue label="订单状态" value={orderStatusLabels[selected.status]} /><SummaryValue label="支付方式" value={selected.payment_method === "balance" ? "余额支付" : "-"} /><SummaryValue label="原价" value={`${selected.currency} ${selected.original_amount.toFixed(2)}`} /><SummaryValue label="优惠" value={`${selected.currency} ${selected.discount_amount.toFixed(2)}`} /><SummaryValue label="最终价格" value={`${selected.currency} ${selected.final_amount.toFixed(2)}`} /><SummaryValue label="创建时间" value={new Date(selected.created_at).toLocaleString("zh-CN")} /></div><div className="dialog-actions"><button className="outline-button" onClick={() => setSelected(null)}>关闭</button>{selected.status === "pending_payment" && <button className="primary compact" onClick={() => pay(selected)}>立即支付</button>}</div></section></div>}
+  </div>;
+}
+
+function SummaryValue({ label, value }: { label: string; value: string }) {
+  return <div><span>{label}</span><b>{value}</b></div>;
+}
+
+function InstancesPage({ onRent, onNotice, instances, setInstances, onInstanceAction, onInstanceUpdate, onInstanceDelete }: ConsoleSectionsProps) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("全部状态");
   const [instanceView, setInstanceView] = useState("实例列表");
   const [editing, setEditing] = useState<Instance | null>(null);
   const [moreInstanceId, setMoreInstanceId] = useState<string | null>(null);
   const visible = useMemo(() => instances.filter((instance) => (status === "全部状态" || instance.status === status) && `${instance.name}${instance.id}${instance.publicIp}`.toLowerCase().includes(query.toLowerCase())), [instances, query, status]);
-  const togglePower = (id: string) => setInstances((items) => items.map((item) => item.id === id ? { ...item, status: item.status === "运行中" ? "已停止" : "运行中" } : item));
-  const saveInstance = () => {
+  const togglePower = async (instance: Instance) => {
+    try {
+      await onInstanceAction(instance.id, instance.status === "运行中" ? "stop" : "start");
+      onNotice(instance.status === "运行中" ? "实例已停止" : "实例已启动");
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : "实例操作失败");
+    }
+  };
+  const saveInstance = async () => {
     if (!editing) return;
-    setInstances((items) => items.map((item) => item.id === editing.id ? editing : item));
-    setEditing(null);
-    onNotice("实例配置已保存");
+    try {
+      await onInstanceUpdate(editing.id, { name: editing.name, auto_renew: editing.autoRenew });
+      setEditing(null);
+      onNotice("实例配置已保存");
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : "实例配置保存失败");
+    }
   };
   const exportInstances = () => {
     downloadCsv("instances.csv", [["实例名称", "实例 ID", "状态", "区域", "规格", "公网 IP", "计费"], ...visible.map((item) => [item.name, item.id, item.status, `${item.region}/${item.zone}`, item.spec, item.publicIp, item.billing])]);
@@ -221,7 +302,7 @@ function InstancesPage({ onRent, onNotice, instances, setInstances }: ConsoleSec
       { label: "GPU 使用率", value: "72%", note: "平均值", icon: <Gauge size={18} />, tone: "orange" },
       { label: "预计本月", value: "$186.42", note: "较预算低 18%", icon: <CircleDollarSign size={18} />, tone: "purple" },
     ]} />
-    <section className="panel table-panel"><div className="table-toolbar"><div className="toolbar-actions"><label className="search-box wide-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索名称、实例 ID 或 IP" /></label><label className="select-control"><Filter size={15} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option>全部状态</option><option>运行中</option><option>已停止</option></select><ChevronDown size={14} /></label></div><div className="toolbar-actions"><button className="outline-button" onClick={exportInstances}><Download size={14} />导出</button><button className="icon-button" title="刷新列表" onClick={() => onNotice("实例状态已刷新")}><RefreshCw size={15} /></button></div></div><div className="responsive-table"><div className="table-row table-head instance-table"><span>实例名称 / ID</span><span>状态</span><span>区域 / 可用区</span><span>规格与磁盘</span><span>系统镜像</span><span>公网 / 私网 IP</span><span>计费</span><span>操作</span></div>{visible.map((instance) => <div className="table-row instance-table" key={instance.id}><div className="instance-name"><strong>{instance.name}</strong><small>{instance.id}</small></div><span className={`status-label ${instance.status === "运行中" ? "success" : "neutral"}`}><i />{instance.status}</span><span>{instance.region}<small>{instance.zone}</small></span><span>{instance.spec}<small>{instance.disk}</small></span><span>{instance.os}</span><span className="ip-cell"><code>{instance.publicIp}</code><small>{instance.privateIp}</small></span><span>{instance.billing}<small>{instance.price}</small></span><div className="row-menu"><button title="启动或停止" onClick={() => { togglePower(instance.id); onNotice(instance.status === "运行中" ? "实例已停止" : "实例已启动"); }}><Power size={15} /></button><button title="编辑实例" onClick={() => setEditing(instance)}><Edit3 size={15} /></button><button title="更多操作" aria-expanded={moreInstanceId === instance.id} onClick={() => setMoreInstanceId((current) => current === instance.id ? null : instance.id)}><MoreHorizontal size={16} /></button>{moreInstanceId === instance.id && <div className="row-action-popover"><button onClick={() => duplicateInstance(instance)}>创建副本</button><button onClick={() => { setMoreInstanceId(null); onNotice(`已打开 ${instance.name} 重置密码流程`); }}>重置密码</button><button className="danger" onClick={() => { setInstances((items) => items.filter((item) => item.id !== instance.id)); setMoreInstanceId(null); onNotice("实例已删除"); }}>删除实例</button></div>}</div></div>)}</div></section></> : instanceView === "密钥对" ? <SshKeysView onNotice={onNotice} /> : <CloudAssistantView onNotice={onNotice} />}
+    <section className="panel table-panel"><div className="table-toolbar"><div className="toolbar-actions"><label className="search-box wide-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索名称、实例 ID 或 IP" /></label><label className="select-control"><Filter size={15} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option>全部状态</option><option>运行中</option><option>已停止</option></select><ChevronDown size={14} /></label></div><div className="toolbar-actions"><button className="outline-button" onClick={exportInstances}><Download size={14} />导出</button><button className="icon-button" title="刷新列表" onClick={() => onNotice("实例状态已刷新")}><RefreshCw size={15} /></button></div></div><div className="responsive-table"><div className="table-row table-head instance-table"><span>实例名称 / ID</span><span>状态</span><span>区域 / 可用区</span><span>规格与磁盘</span><span>系统镜像</span><span>公网 / 私网 IP</span><span>计费</span><span>操作</span></div>{visible.map((instance) => <div className="table-row instance-table" key={instance.id}><div className="instance-name"><strong>{instance.name}</strong><small>{instance.id}</small></div><span className={`status-label ${instance.status === "运行中" ? "success" : "neutral"}`}><i />{instance.status}</span><span>{instance.region}<small>{instance.zone}</small></span><span>{instance.spec}<small>{instance.disk}</small></span><span>{instance.os}</span><span className="ip-cell"><code>{instance.publicIp}</code><small>{instance.privateIp}</small></span><span>{instance.billing}<small>{instance.price}</small></span><div className="row-menu"><button title="启动或停止" onClick={() => void togglePower(instance)}><Power size={15} /></button><button title="编辑实例" onClick={() => setEditing(instance)}><Edit3 size={15} /></button><button title="更多操作" aria-expanded={moreInstanceId === instance.id} onClick={() => setMoreInstanceId((current) => current === instance.id ? null : instance.id)}><MoreHorizontal size={16} /></button>{moreInstanceId === instance.id && <div className="row-action-popover"><button onClick={() => duplicateInstance(instance)}>创建副本</button><button onClick={() => { setMoreInstanceId(null); onNotice(`已打开 ${instance.name} 重置密码流程`); }}>重置密码</button><button className="danger" onClick={() => void onInstanceDelete(instance.id).then(() => { setMoreInstanceId(null); onNotice("实例已删除"); })}>删除实例</button></div>}</div></div>)}</div></section></> : instanceView === "密钥对" ? <SshKeysView onNotice={onNotice} /> : <CloudAssistantView onNotice={onNotice} />}
     {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(null)}><section className="edit-dialog" role="dialog" aria-modal="true" aria-label="编辑实例" onMouseDown={(event) => event.stopPropagation()}><div className="dialog-head"><div><span>INSTANCE SETTINGS</span><h3>编辑实例</h3><p>{editing.id}</p></div><button className="icon-button" onClick={() => setEditing(null)} aria-label="关闭"><X size={18} /></button></div><div className="form-grid"><label className="full">实例名称<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /></label><label>计费方式<select value={editing.billing} onChange={(event) => setEditing({ ...editing, billing: event.target.value })}><option>按量计费</option><option>包月</option></select></label><label>系统镜像<select value={editing.os} onChange={(event) => setEditing({ ...editing, os: event.target.value })}><option>Ubuntu 24.04</option><option>Ubuntu 22.04</option><option>PyTorch 2.5</option></select></label><label className="full">实例规格<select value={editing.spec} onChange={(event) => setEditing({ ...editing, spec: event.target.value })}><option>RTX 4090 · 16C 64G</option><option>A100 80G · 24C 180G</option><option>L40S 48G · 20C 96G</option></select></label></div><div className="change-note"><CloudCog size={18} /><span><b>配置变更说明</b>运行中的实例变配需要短暂停机，新配置将在重启后生效。</span></div><div className="dialog-actions"><button className="secondary" onClick={() => setEditing(null)}>取消</button><button className="primary" onClick={saveInstance}>保存变更</button></div></section></div>}
   </div>;
 }
