@@ -4,6 +4,7 @@ import {
   ChevronRight, Edit3, Play, RotateCw, ShieldCheck, Square,
 } from "lucide-react";
 import { id, useConsoleStore } from "../../store";
+import { api } from "../../api";
 import type { Instance } from "../../domain";
 import {
   EmptyState, formatShortDateTime as fmt, PageHeader, Panel, StatusBadge, Tabs,
@@ -14,8 +15,15 @@ import { EditInstanceModal } from "./InstanceDialogs";
 export function InstanceDetailPage() {
   const { instanceId = "" } = useParams(); const { state, mutate, loading } = useConsoleStore(); const navigate = useNavigate(); const instance = state.instances.find((item) => item.id === instanceId); const [tab, setTab] = useState("监控"); const [edit, setEdit] = useState(false);
   if (!instance) return <><PageHeader title="实例不存在" description="该实例可能已被删除，或链接地址不正确。" /><EmptyState title="找不到实例" action={<button className="button primary" onClick={() => navigate("/instances")}>返回实例列表</button>} /></>;
-  const action = async (status: "running" | "stopped", text: string) => mutate((s) => ({ ...s, instances: s.instances.map((i) => i.id === instance.id ? { ...i, status } : i), logs: [{ id: id("log"), instanceId: instance.id, action: text, operator: "admin", result: "成功", createdAt: new Date().toISOString() }, ...s.logs] }), `${text}操作成功`);
-  return <><PageHeader title={instance.name} description={`${instance.id} · ${instance.region} / ${instance.zone}`} actions={<><button className="button secondary" onClick={() => navigate("/instances")}><ChevronRight className="flip" size={16} />返回列表</button>{instance.status === "running" ? <button className="button secondary" disabled={loading} onClick={() => action("stopped", "停止实例")}><Square size={15} />停止</button> : <button className="button primary" disabled={loading} onClick={() => action("running", "启动实例")}><Play size={15} />启动</button>}<button className="button secondary" disabled={loading || instance.status !== "running"} onClick={() => action("running", "重启实例")}><RotateCw size={15} />重启</button><button className="button secondary" onClick={() => setEdit(true)}><Edit3 size={15} />编辑</button></>} />
+  const action = async (status: "running" | "stopped", text: string, providerAction: "start" | "stop" | "restart") => {
+    try {
+      await api.instanceAction(instance.id, providerAction);
+      await mutate((s) => ({ ...s, instances: s.instances.map((i) => i.id === instance.id ? { ...i, status } : i), logs: [{ id: id("log"), instanceId: instance.id, action: text, operator: "admin", result: "成功", createdAt: new Date().toISOString() }, ...s.logs] }), `${text}操作成功`);
+    } catch (error) {
+      window.alert(error instanceof Error ? `${text}失败：${error.message}` : `${text}失败`);
+    }
+  };
+  return <><PageHeader title={instance.name} description={`${instance.id} · ${instance.region} / ${instance.zone}`} actions={<><button className="button secondary" onClick={() => navigate("/instances")}><ChevronRight className="flip" size={16} />返回列表</button>{instance.status === "running" ? <button className="button secondary" disabled={loading} onClick={() => action("stopped", "停止实例", "stop")}><Square size={15} />停止</button> : <button className="button primary" disabled={loading} onClick={() => action("running", "启动实例", "start")}><Play size={15} />启动</button>}<button className="button secondary" disabled={loading || instance.status !== "running"} onClick={() => action("running", "重启实例", "restart")}><RotateCw size={15} />重启</button><button className="button secondary" onClick={() => setEdit(true)}><Edit3 size={15} />编辑</button></>} />
     <div className="instance-hero"><div><StatusBadge value={instance.status} /><strong>{instance.cpu} vCPU · {instance.memory} GiB</strong><span>{instance.gpu}</span></div><div><span>私有 IP</span><code>{instance.privateIp}</code></div><div><span>公网 IP</span><code>{instance.publicIp}</code></div><div><span>计费方式</span><strong>{instance.billing === "monthly" ? "包月" : "按量"}</strong></div></div>
     <Tabs items={["概览", "监控", "网络与安全", "磁盘", "操作日志", "续费"]} value={tab} onChange={setTab} />
     {tab === "概览" && <div className="two-column"><Panel title="基础信息"><dl className="detail-list"><dt>实例 ID</dt><dd><code>{instance.id}</code></dd><dt>实例名称</dt><dd>{instance.name}</dd><dt>创建时间</dt><dd>{fmt(instance.createdAt)}</dd><dt>镜像</dt><dd>{instance.image}</dd><dt>可用区</dt><dd>{instance.region} / {instance.zone}</dd><dt>资源组</dt><dd>{state.resourceGroups.find((g) => g.id === instance.resourceGroupId)?.name ?? "默认资源组"}</dd></dl></Panel><Panel title="计算配置"><dl className="detail-list"><dt>vCPU</dt><dd>{instance.cpu} 核</dd><dt>内存</dt><dd>{instance.memory} GiB</dd><dt>GPU</dt><dd>{instance.gpu}</dd><dt>系统盘</dt><dd>{instance.systemDisk} GiB ESSD</dd><dt>自动续费</dt><dd>{instance.autoRenew ? "已开启" : "未开启"}</dd></dl></Panel></div>}

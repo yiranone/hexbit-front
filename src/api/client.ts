@@ -130,6 +130,10 @@ function accessToken() {
   return window.localStorage.getItem(TOKEN_KEY);
 }
 
+function idempotencyHeaders() {
+  return { "Idempotency-Key": crypto.randomUUID() };
+}
+
 export function hasAccessToken() {
   return Boolean(accessToken());
 }
@@ -195,8 +199,14 @@ export const api = {
     method: "PATCH",
     body: JSON.stringify(input),
   }),
-  instanceAction: (id: string, action: "start" | "stop") => request<void>(`/instances/${id}/actions/${action}`, {
+  resetInstancePassword: (id: string, password: string) => request<void>(`/instances/${id}/password`, {
     method: "POST",
+    headers: idempotencyHeaders(),
+    body: JSON.stringify({ password }),
+  }),
+  instanceAction: (id: string, action: "start" | "stop" | "restart") => request<void>(`/instances/${id}/actions/${action}`, {
+    method: "POST",
+    headers: idempotencyHeaders(),
   }),
   deleteInstance: (id: string) => request<void>(`/instances/${id}`, { method: "DELETE" }),
   ensureDemoSession: async () => {
@@ -217,25 +227,25 @@ export const api = {
     body: JSON.stringify({ revision, operation, state }),
   }),
   cloudVpcs: () => request<CloudVPC[]>("/cloud/vpcs"),
-  createCloudVpc: (input: { region_id?: string; name: string; cidr: string; token?: string; resource_group_id?: string }) => request<CloudResourceResult>("/cloud/vpcs", { method: "POST", body: JSON.stringify(input) }),
+  createCloudVpc: (input: { region_id?: string; name: string; cidr: string; token?: string; resource_group_id?: string }) => request<CloudResourceResult>("/cloud/vpcs", { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   deleteCloudVpc: (id: string) => request<CloudOperation>(`/cloud/vpcs/${encodeURIComponent(id)}`, { method: "DELETE" }),
   cloudSubnets: (vpcId: string) => request<CloudSubnet[]>(`/cloud/vpcs/${encodeURIComponent(vpcId)}/subnets`),
-  createCloudSubnet: (input: { region_id?: string; vpc_id: string; zone_id: string; name: string; cidr: string; token?: string }) => request<CloudResourceResult>("/cloud/subnets", { method: "POST", body: JSON.stringify(input) }),
+  createCloudSubnet: (input: { region_id?: string; vpc_id: string; zone_id: string; name: string; cidr: string; token?: string }) => request<CloudResourceResult>("/cloud/subnets", { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   deleteCloudSubnet: (id: string) => request<CloudOperation>(`/cloud/subnets/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  allocateCloudEip: (input: { region_id?: string; name: string; bandwidth: string; token?: string }) => request<CloudEIP>("/cloud/eips", { method: "POST", body: JSON.stringify(input) }),
+  allocateCloudEip: (input: { region_id?: string; name: string; bandwidth: string; token?: string }) => request<CloudEIP>("/cloud/eips", { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   cloudEips: () => request<CloudEIP[]>("/cloud/eips"),
   releaseCloudEip: (id: string) => request<CloudOperation>(`/cloud/eips/${encodeURIComponent(id)}/release`, { method: "POST" }),
-  associateCloudEip: (id: string, instanceId: string) => request<CloudOperation>(`/cloud/eips/${encodeURIComponent(id)}/associate`, { method: "POST", body: JSON.stringify({ instance_id: instanceId }) }),
-  unassociateCloudEip: (id: string) => request<CloudOperation>(`/cloud/eips/${encodeURIComponent(id)}/unassociate`, { method: "POST" }),
+  associateCloudEip: (id: string, instanceId: string) => request<CloudOperation>(`/cloud/eips/${encodeURIComponent(id)}/associate`, { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify({ instance_id: instanceId }) }),
+  unassociateCloudEip: (id: string) => request<CloudOperation>(`/cloud/eips/${encodeURIComponent(id)}/unassociate`, { method: "POST", headers: idempotencyHeaders() }),
   cloudDisks: (instanceId = "") => request<CloudDisk[]>(`/cloud/disks?instance_id=${encodeURIComponent(instanceId)}`),
-  createCloudDisk: (input: { region_id?: string; zone_id: string; name: string; category?: string; size_gib: number; token?: string }) => request<CloudResourceResult>("/cloud/disks", { method: "POST", body: JSON.stringify(input) }),
+  createCloudDisk: (input: { region_id?: string; zone_id: string; name: string; category?: string; size_gib: number; token?: string }) => request<CloudResourceResult>("/cloud/disks", { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   deleteCloudDisk: (id: string) => request<CloudOperation>(`/cloud/disks/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  attachCloudDisk: (id: string, instanceId: string) => request<CloudOperation>(`/cloud/disks/${encodeURIComponent(id)}/attach`, { method: "POST", body: JSON.stringify({ instance_id: instanceId }) }),
-  detachCloudDisk: (id: string, instanceId: string) => request<CloudOperation>(`/cloud/disks/${encodeURIComponent(id)}/detach`, { method: "POST", body: JSON.stringify({ instance_id: instanceId }) }),
+  attachCloudDisk: (id: string, instanceId: string) => request<CloudOperation>(`/cloud/disks/${encodeURIComponent(id)}/attach`, { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify({ instance_id: instanceId }) }),
+  detachCloudDisk: (id: string, instanceId: string) => request<CloudOperation>(`/cloud/disks/${encodeURIComponent(id)}/detach`, { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify({ instance_id: instanceId }) }),
   cloudSecurityGroups: (vpcId = "") => request<CloudSecurityGroup[]>(`/cloud/security-groups?vpc_id=${encodeURIComponent(vpcId)}`),
-  createCloudSecurityGroup: (input: { region_id?: string; vpc_id: string; name: string; description?: string; token?: string }) => request<CloudResourceResult>("/cloud/security-groups", { method: "POST", body: JSON.stringify(input) }),
+  createCloudSecurityGroup: (input: { region_id?: string; vpc_id: string; name: string; description?: string; token?: string }) => request<CloudResourceResult>("/cloud/security-groups", { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   deleteCloudSecurityGroup: (id: string) => request<CloudOperation>(`/cloud/security-groups/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  authorizeCloudSecurityGroup: (id: string, input: { protocol: string; port_range: string; source_cidr: string; policy?: string; token?: string }) => request<CloudOperation>(`/cloud/security-groups/${encodeURIComponent(id)}/rules`, { method: "POST", body: JSON.stringify(input) }),
-  revokeCloudSecurityGroup: (id: string, input: { protocol: string; port_range: string; source_cidr: string; policy?: string }) => request<CloudOperation>(`/cloud/security-groups/${encodeURIComponent(id)}/rules/revoke`, { method: "POST", body: JSON.stringify(input) }),
+  authorizeCloudSecurityGroup: (id: string, input: { protocol: string; port_range: string; source_cidr: string; policy?: string; token?: string }) => request<CloudOperation>(`/cloud/security-groups/${encodeURIComponent(id)}/rules`, { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
+  revokeCloudSecurityGroup: (id: string, input: { protocol: string; port_range: string; source_cidr: string; policy?: string }) => request<CloudOperation>(`/cloud/security-groups/${encodeURIComponent(id)}/rules/revoke`, { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   cloudResources: (type = "") => request<CloudResourceMapping[]>(`/cloud/resources?type=${encodeURIComponent(type)}`),
 };
