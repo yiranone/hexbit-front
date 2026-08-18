@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AlertRule, ApiKey, ConsoleState, ConsoleUser, Disk, Instance, InstanceDraft, PublicIp, ResourceGroup, SecurityGroup, Tag, Vpc } from "../domain";
-import { api, ApiError } from "../api";
+import { api, ApiError, type ApiUser } from "../api";
 
 const now = new Date();
 const iso = (days = 0) => new Date(now.getTime() + days * 86400000).toISOString();
@@ -66,11 +66,12 @@ const seed: ConsoleState = {
 };
 
 type Update = (state: ConsoleState) => ConsoleState;
-interface StoreValue { state: ConsoleState; loading: boolean; ready: boolean; error: string; mutate: (update: Update, message?: string) => Promise<boolean>; reset: () => Promise<boolean>; reload: () => Promise<void>; createInstances: (draft: InstanceDraft) => Promise<Instance[]>; toast: string; clearToast: () => void; }
+interface StoreValue { state: ConsoleState; user: ApiUser | null; loading: boolean; ready: boolean; error: string; mutate: (update: Update, message?: string) => Promise<boolean>; reset: () => Promise<boolean>; reload: () => Promise<void>; createInstances: (draft: InstanceDraft) => Promise<Instance[]>; toast: string; clearToast: () => void; }
 const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ConsoleState>(() => structuredClone(seed));
+  const [user, setUser] = useState<ApiUser | null>(null);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -92,7 +93,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      await api.ensureDemoSession();
+      const profile = await api.ensureDemoSession();
+      setUser(profile);
       try {
         const snapshot = await api.consoleState<ConsoleState>();
         const upgraded = upgradeState(snapshot.state);
@@ -198,7 +200,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } finally { setLoading(false); }
   }, [applySnapshot, loading, persist, ready, reload]);
   const reset = useCallback(() => mutate(() => structuredClone(seed), "数据库数据已恢复为初始状态"), [mutate]);
-  const value = useMemo(() => ({ state, loading, ready, error, mutate, createInstances, toast, clearToast: () => setToast(""), reset, reload }), [state, loading, ready, error, mutate, createInstances, toast, reset, reload]);
+  const value = useMemo(() => ({ state, user, loading, ready, error, mutate, createInstances, toast, clearToast: () => setToast(""), reset, reload }), [state, user, loading, ready, error, mutate, createInstances, toast, reset, reload]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 

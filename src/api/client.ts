@@ -115,7 +115,21 @@ export type CloudDisk = { id: string; name: string; category: string; size_gib: 
 export type CloudSecurityGroup = { id: string; name: string; vpc_id: string; description: string; rule_count: number };
 export type CloudOperation = { request_id: string };
 export type CloudResourceResult = { id: string; provider_id: string; request_id: string };
-export type CloudResourceMapping = { public_id: string; resource_type: string; provider_name: string; provider_resource_id: string; region_id: string; status: string };
+export type CloudResourceMapping = { public_id: string; resource_type: string; provider_name: string; provider_account_id?: string; provider_resource_id: string; region_id: string; status: string };
+export type AdminAlibabaAccount = {
+  id: string; provider: string; name: string; account_id: string; region_id: string; access_key_id: string;
+  has_credentials: boolean;
+  default_image_id: string; default_vswitch_id: string; default_security_group_id: string;
+  status: string; bound_user_count: number; resource_count: number; last_tested_at?: string; last_test_status?: string;
+  created_at: string; updated_at: string;
+};
+export type AdminUser = { id: string; email: string; display_name: string; role: string; status: string; created_at: string };
+export type AdminAccountUser = { user_id: string; email: string; display_name: string; role: string; is_default: boolean; created_at: string };
+export type AdminAliyunRegion = { id: string; code: string; name: string; status: string; zone_count: number; created_at: string; updated_at: string };
+export type AdminAliyunZone = { id: string; region_id: string; region_code: string; region_name: string; zone_code: string; name: string; status: string; created_at: string; updated_at: string };
+export type AdminWallet = { user_id: string; email: string; display_name: string; currency: string; balance: number; version: number; updated_at: string };
+export type AdminOrder = { order: ApiOrder; user_id: string; email: string; display_name: string };
+export type AdminRecharge = { id: string; user_id: string; email: string; display_name: string; kind: string; amount: number; balance_after: number; description: string; created_at: string };
 
 type ApiEnvelope<T> = { data: T };
 type AuthResult = { access_token: string; token_type: string; expires_in: number; user: ApiUser };
@@ -248,4 +262,28 @@ export const api = {
   authorizeCloudSecurityGroup: (id: string, input: { protocol: string; port_range: string; source_cidr: string; policy?: string; token?: string }) => request<CloudOperation>(`/cloud/security-groups/${encodeURIComponent(id)}/rules`, { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   revokeCloudSecurityGroup: (id: string, input: { protocol: string; port_range: string; source_cidr: string; policy?: string }) => request<CloudOperation>(`/cloud/security-groups/${encodeURIComponent(id)}/rules/revoke`, { method: "POST", headers: idempotencyHeaders(), body: JSON.stringify(input) }),
   cloudResources: (type = "") => request<CloudResourceMapping[]>(`/cloud/resources?type=${encodeURIComponent(type)}`),
+  adminUsers: () => request<AdminUser[]>("/admin/users"),
+  createAdminUser: (input: { email: string; password: string; display_name: string; role: "member" | "viewer" }) => request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(input) }),
+  updateAdminUser: (id: string, input: { display_name: string; password?: string; role: "member" | "viewer"; status: "active" | "disabled" }) => request<void>(`/admin/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  disableAdminUser: (id: string) => request<void>(`/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminWallets: (query = "") => request<AdminWallet[]>(`/admin/wallets?q=${encodeURIComponent(query)}`),
+  adminOrders: (status = "", query = "") => request<AdminOrder[]>(`/admin/orders?status=${encodeURIComponent(status)}&q=${encodeURIComponent(query)}`),
+  adminRecharges: (query = "") => request<AdminRecharge[]>(`/admin/recharges?q=${encodeURIComponent(query)}`),
+  adminAliyunRegions: () => request<AdminAliyunRegion[]>("/admin/catalog/regions"),
+  createAdminAliyunRegion: (input: { code: string; name: string; status?: string }) => request<AdminAliyunRegion>("/admin/catalog/regions", { method: "POST", body: JSON.stringify(input) }),
+  updateAdminAliyunRegion: (id: string, input: { code: string; name: string; status: string }) => request<void>(`/admin/catalog/regions/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  disableAdminAliyunRegion: (id: string) => request<void>(`/admin/catalog/regions/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminAliyunZones: (regionId = "") => request<AdminAliyunZone[]>(`/admin/catalog/zones?region_id=${encodeURIComponent(regionId)}`),
+  createAdminAliyunZone: (input: { region_id: string; zone_code: string; name: string; status?: string }) => request<AdminAliyunZone>("/admin/catalog/zones", { method: "POST", body: JSON.stringify(input) }),
+  updateAdminAliyunZone: (id: string, input: { region_id: string; zone_code: string; name: string; status: string }) => request<void>(`/admin/catalog/zones/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  disableAdminAliyunZone: (id: string) => request<void>(`/admin/catalog/zones/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminAlibabaAccounts: () => request<AdminAlibabaAccount[]>("/admin/provider-accounts"),
+  createAdminAlibabaAccount: (input: Record<string, unknown>) => request<AdminAlibabaAccount>("/admin/provider-accounts", { method: "POST", body: JSON.stringify(input) }),
+  updateAdminAlibabaAccount: (id: string, input: Record<string, unknown>) => request<void>(`/admin/provider-accounts/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  disableAdminAlibabaAccount: (id: string) => request<void>(`/admin/provider-accounts/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminAccountUsers: (id: string) => request<AdminAccountUser[]>(`/admin/provider-accounts/${encodeURIComponent(id)}/users`),
+  bindAdminAccountUser: (id: string, userId: string, isDefault: boolean) => request<void>(`/admin/provider-accounts/${encodeURIComponent(id)}/users`, { method: "POST", body: JSON.stringify({ user_id: userId, is_default: isDefault }) }),
+  unbindAdminAccountUser: (id: string, userId: string) => request<void>(`/admin/provider-accounts/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
+  adminProviderResources: (type = "") => request<CloudResourceMapping[]>(`/admin/provider-resources?type=${encodeURIComponent(type)}`),
+  associateAdminResource: (resourceType: string, resourceId: string, accountId: string) => request<void>(`/admin/provider-resources/${encodeURIComponent(resourceType)}/${encodeURIComponent(resourceId)}/associate`, { method: "POST", body: JSON.stringify({ account_id: accountId }) }),
 };

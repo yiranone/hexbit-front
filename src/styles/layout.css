@@ -9,6 +9,9 @@
 .sidebar nav a, .sidebar-foot button { min-height: 40px; display: flex; align-items: center; gap: 11px; border: 0; border-radius: 5px; background: transparent; color: #536979; padding: 0 11px; white-space: nowrap; font-size: 13px; }
 .sidebar nav a:hover, .sidebar-foot button:hover { background: #eef4f8; color: #1769a0; }
 .sidebar nav a.active { background: #e7f2fa; color: #126da9; box-shadow: inset 3px 0 #1683cc; font-weight: 600; }
+.sidebar .nav-section-title { min-height: 32px; display: flex; align-items: center; gap: 9px; margin-top: 10px; border-top: 1px solid #e1e8ed; color: #8a9aa5; padding: 12px 11px 4px; font-size: 10px; font-weight: 700; }
+.collapsed .nav-section-title { justify-content: center; padding-left: 0; padding-right: 0; }
+.collapsed .nav-section-title span { display: none; }
 .sidebar nav a svg:last-child { margin-left: auto; color: #a3b0ba; }
 .sidebar-foot { border-top: 1px solid #e1e8ed; padding: 9px 8px; }
 .sidebar-foot button { width: 100%; }

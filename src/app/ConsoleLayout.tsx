@@ -5,6 +5,9 @@ import {
   Globe2, HardDrive, HelpCircle, KeyRound, LayoutDashboard,
   Menu, Network, ReceiptText, RefreshCw,
   Server, Users, WalletCards, X,
+  ShieldCheck,
+  UserCog,
+  Database,
 } from "lucide-react";
 import { id, useConsoleStore } from "../store";
 import { Confirm, Field, Modal } from "../shared";
@@ -18,6 +21,10 @@ import { NetworkPage } from "../features/network/NetworkPage";
 import { ResourcesPage } from "../features/resources/ResourcesPage";
 import { StoragePage } from "../features/storage/StoragePage";
 import { HelpPage } from "../features/support/HelpPage";
+import { AdminAlibabaAccountsPage } from "../features/admin/AdminAlibabaAccountsPage";
+import { AdminUsersPage } from "../features/admin/AdminUsersPage";
+import { AdminAliyunCatalogPage } from "../features/admin/AdminAliyunCatalogPage";
+import { AdminFinancePage } from "../features/admin/AdminFinancePage";
 import "../styles/index.css";
 
 const menu = [
@@ -33,10 +40,10 @@ const menu = [
   { to: "/api-keys", label: "API 密钥", icon: KeyRound },
   { to: "/help", label: "帮助中心", icon: HelpCircle },
 ];
-const routeNames: Record<string, string> = { compute: "云服务器", instances: "实例管理", network: "网络与 VPC", storage: "存储管理", resources: "资源中心", monitoring: "云监控", billing: "用量与账单", users: "用户与权限", "api-keys": "API 密钥", help: "帮助中心", new: "创建云服务器" };
+const routeNames: Record<string, string> = { compute: "云服务器", instances: "实例管理", network: "网络与 VPC", storage: "存储管理", resources: "资源中心", monitoring: "云监控", billing: "用量与账单", users: "用户与权限", "api-keys": "API 密钥", help: "帮助中心", admin: "系统管理", "provider-accounts": "阿里云账号", catalog: "云基础数据", finance: "用户资金与订单", new: "创建云服务器" };
 
 export function ConsoleLayout() {
-  const { state, toast, reset, ready, error, loading, reload, mutate } = useConsoleStore();
+  const { state, user, toast, reset, ready, error, loading, reload, mutate } = useConsoleStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < 960);
@@ -53,7 +60,7 @@ export function ConsoleLayout() {
   return <div className={`console-shell ${collapsed ? "collapsed" : ""}`}>
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       <div className="brand"><img src="/hexbit-mark.svg" alt="" /><strong>HEXBIT</strong><button className="icon-button mobile-close" onClick={() => setMobileOpen(false)} aria-label="关闭导航"><X size={18} /></button></div>
-      <nav>{menu.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === "/"} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)}><Icon size={18} /><span>{label}</span><ChevronRight size={14} /></NavLink>)}</nav>
+      <nav>{menu.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === "/"} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)}><Icon size={18} /><span>{label}</span><ChevronRight size={14} /></NavLink>)}{user?.role === "admin" && <><div className="nav-section-title"><ShieldCheck size={15} /><span>系统管理</span></div><NavLink to="/admin/provider-accounts" title={collapsed ? "阿里云账号" : undefined} onClick={() => setMobileOpen(false)}><CloudCog size={18} /><span>阿里云账号</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/users" title={collapsed ? "用户管理" : undefined} onClick={() => setMobileOpen(false)}><UserCog size={18} /><span>用户管理</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/catalog" title={collapsed ? "云基础数据" : undefined} onClick={() => setMobileOpen(false)}><Database size={18} /><span>云基础数据</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/finance" title={collapsed ? "用户资金与订单" : undefined} onClick={() => setMobileOpen(false)}><WalletCards size={18} /><span>用户资金与订单</span><ChevronRight size={14} /></NavLink></>}</nav>
       <div className="sidebar-foot"><button onClick={() => setResetOpen(true)}><RefreshCw size={17} /><span>恢复初始数据</span></button></div>
     </aside>
     {mobileOpen && <button className="sidebar-scrim" aria-label="关闭导航" onClick={() => setMobileOpen(false)} />}
@@ -76,6 +83,7 @@ export function ConsoleLayout() {
         <Route path="/network" element={<NetworkPage />} /><Route path="/storage" element={<StoragePage />} /><Route path="/resources" element={<ResourcesPage />} />
         <Route path="/monitoring" element={<MonitoringPage />} /><Route path="/billing" element={<BillingPage onRecharge={() => setRechargeOpen(true)} />} />
         <Route path="/users" element={<UsersPage />} /><Route path="/api-keys" element={<ApiKeysPage />} /><Route path="/help" element={<HelpPage />} />
+        <Route path="/admin/provider-accounts" element={<AdminAlibabaAccountsPage />} /><Route path="/admin/users" element={<AdminUsersPage />} /><Route path="/admin/catalog" element={<AdminAliyunCatalogPage />} /><Route path="/admin/finance" element={<AdminFinancePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></main>
     </div>
