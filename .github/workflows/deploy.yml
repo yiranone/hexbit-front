@@ -99,7 +99,7 @@ jobs:
             "${{ steps.archive.outputs.archive_path }}" \
             "${DEPLOY_SSH_USER}@${DEPLOY_HOST}:/tmp/${{ steps.archive.outputs.archive_name }}"
 
-      - name: Deploy archive atomically
+      - name: Deploy archive to writable target
         env:
           DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
           ARCHIVE_NAME: ${{ steps.archive.outputs.archive_name }}
@@ -110,9 +110,7 @@ jobs:
           set -euo pipefail
           umask 022
 
-          parent_dir="$(dirname "${DEPLOY_TARGET_DIR}")"
-          release_dir="$(mktemp -d "${parent_dir}/.${ARCHIVE_NAME%.tar.gz}.XXXXXX")"
-          backup_dir="${DEPLOY_TARGET_DIR}.previous"
+          release_dir="$(mktemp -d "/tmp/.${ARCHIVE_NAME%.tar.gz}.XXXXXX")"
           cleanup() { rm -rf "${release_dir}"; }
           trap cleanup EXIT
 
@@ -120,11 +118,16 @@ jobs:
           find "${release_dir}" -type d -exec chmod 755 {} +
           find "${release_dir}" -type f -exec chmod 644 {} +
 
-          rm -rf "${backup_dir}"
-          if [ -e "${DEPLOY_TARGET_DIR}" ]; then
-            mv "${DEPLOY_TARGET_DIR}" "${backup_dir}"
+          if [ ! -d "${DEPLOY_TARGET_DIR}" ]; then
+            mkdir -p "${DEPLOY_TARGET_DIR}"
           fi
-          mv "${release_dir}" "${DEPLOY_TARGET_DIR}"
-          trap - EXIT
-          rm -rf "${backup_dir}" "/tmp/${ARCHIVE_NAME}"
+          if [ ! -w "${DEPLOY_TARGET_DIR}" ]; then
+            echo "DEPLOY_TARGET_DIR is not writable: ${DEPLOY_TARGET_DIR}" >&2
+            echo "Set DEPLOY_TARGET_DIR to a directory owned by the SSH user, or grant write permission to it." >&2
+            exit 1
+          fi
+
+          find "${DEPLOY_TARGET_DIR}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          cp -a "${release_dir}/." "${DEPLOY_TARGET_DIR}/"
+          rm -f "/tmp/${ARCHIVE_NAME}"
           EOF
