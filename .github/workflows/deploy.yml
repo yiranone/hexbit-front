@@ -73,7 +73,9 @@ jobs:
         run: |
           set -euo pipefail
           ARCHIVE_NAME="hexbit-front-${GITHUB_SHA::12}.tar.gz"
-          tar -czf "${ARCHIVE_NAME}" dist
+          ARCHIVE_PATH="/tmp/${ARCHIVE_NAME}"
+          tar -czf "${ARCHIVE_PATH}" dist
+          echo "archive_path=${ARCHIVE_PATH}" >> "${GITHUB_OUTPUT}"
           echo "archive_name=${ARCHIVE_NAME}" >> "${GITHUB_OUTPUT}"
 
       - name: Configure SSH
@@ -94,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           scp -i "${HOME}/.ssh/id_ed25519" -P "${DEPLOY_PORT}" \
-            "${{ steps.archive.outputs.archive_name }}" \
+            "${{ steps.archive.outputs.archive_path }}" \
             "${DEPLOY_SSH_USER}@${DEPLOY_HOST}:/tmp/${{ steps.archive.outputs.archive_name }}"
 
       - name: Deploy archive atomically

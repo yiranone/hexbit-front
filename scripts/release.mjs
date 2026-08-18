@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 const dist = resolve(root, "dist");
-const releaseDir = resolve(root, "release");
+const releaseDir = resolve("/tmp", "hexbit-front");
 
 if (!existsSync(dist)) {
   throw new Error("未找到 dist 目录。请先运行 npm run build。");
