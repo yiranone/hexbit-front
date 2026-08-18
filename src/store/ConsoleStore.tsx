@@ -146,6 +146,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       const current = stateRef.current;
       const subnet = current.subnets.find((item) => item.id === draft.subnetId);
+      const resourceGroupName = current.resourceGroups.find((item) => item.id === draft.resourceGroupId)?.name ?? "default";
+      const offeringId = draft.gpu.includes("A100") ? "cq-a100" : draft.gpu.includes("A10") ? "cq-a10" : draft.cpu >= 8 ? "cq-c8" : "cq-c4";
+      const remoteInstances = await api.createInstances({
+        offering_id: offeringId,
+        name: draft.name,
+        billing_mode: draft.billing,
+        duration: draft.duration,
+        quantity: draft.quantity,
+        image: draft.image,
+        vpc: draft.vpcId,
+        private_ip: draft.privateIp || null,
+        auto_renew: draft.autoRenew,
+        resource_group: resourceGroupName,
+      });
+      if (remoteInstances.length !== draft.quantity) throw new Error("后端返回的实例数量与购买数量不一致");
       const createdAt = new Date().toISOString();
       const unitPrice = calculatePrice({ ...draft, quantity: 1 });
       const total = unitPrice * draft.quantity;
@@ -154,13 +169,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const usedPrivateIps = new Set(current.instances.map((item) => item.privateIp));
       const usedPublicIps = new Set(current.publicIps.map((item) => item.address));
       const resources = Array.from({ length: draft.quantity }, (_, index) => {
-        const instanceId = id("ins");
+        const remote = remoteInstances[index];
+        const instanceId = remote?.id ?? id("ins");
         const instanceName = draft.quantity > 1 ? `${draft.name}-${String(index + 1).padStart(2, "0")}` : draft.name;
         const diskId = draft.dataDisk > 0 ? id("disk") : undefined;
         const publicIpId = draft.publicIp ? id("eip") : undefined;
         const publicIpAddress = draft.publicIp ? allocateHostIp("103.91.209.0/24", usedPublicIps, 30) : "未绑定";
         const privateIp = draft.privateIp && draft.quantity === 1 ? draft.privateIp : allocateHostIp(subnet.cidr, usedPrivateIps, 10);
-        const instance: Instance = { id: instanceId, name: instanceName, status: "running", region: draft.region, zone: draft.zone, cpu: draft.cpu, memory: draft.memory, gpu: draft.gpu, image: draft.image, vpcId: draft.vpcId, subnetId: draft.subnetId, privateIp, publicIp: publicIpAddress, bandwidth: draft.publicIp ? draft.bandwidth : 0, billing: draft.billing, price: unitPrice, autoRenew: draft.autoRenew, systemDisk: draft.systemDisk, dataDisks: diskId ? [diskId] : [], securityGroupIds: draft.securityGroupIds, resourceGroupId: draft.resourceGroupId, createdAt, expiresAt: draft.billing === "monthly" ? new Date(Date.now() + draft.duration * 30 * 86400000).toISOString() : undefined };
+        const instance: Instance = { id: instanceId, name: instanceName, status: remote?.status === "stopped" ? "stopped" : "running", region: draft.region, zone: draft.zone, cpu: draft.cpu, memory: draft.memory, gpu: draft.gpu, image: draft.image, vpcId: draft.vpcId, subnetId: draft.subnetId, privateIp: remote?.private_ip ?? privateIp, publicIp: remote?.public_ip ?? publicIpAddress, bandwidth: draft.publicIp ? draft.bandwidth : 0, billing: draft.billing, price: remote?.price ?? unitPrice, autoRenew: draft.autoRenew, systemDisk: draft.systemDisk, dataDisks: diskId ? [diskId] : [], securityGroupIds: draft.securityGroupIds, resourceGroupId: draft.resourceGroupId, createdAt, expiresAt: draft.billing === "monthly" ? new Date(Date.now() + draft.duration * 30 * 86400000).toISOString() : undefined };
         const orderId = id("ord");
         const disk: Disk | undefined = diskId ? { id: diskId, name: `${instanceName}-data-01`, size: draft.dataDisk, type: "ESSD", status: "in-use", instanceId, createdAt } : undefined;
         const publicIp: PublicIp | undefined = publicIpId ? { id: publicIpId, address: publicIpAddress, bandwidth: draft.bandwidth, status: "bound", instanceId } : undefined;
