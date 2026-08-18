@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:18080/api/v1";
+// Use the reverse-proxied API in deployed builds; local development can still
+// override this with VITE_API_BASE_URL when the backend runs on another port.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 const TOKEN_KEY = "hexbit_access_token";
 const HTTP_NO_CONTENT = 204;
 
