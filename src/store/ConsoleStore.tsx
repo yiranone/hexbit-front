@@ -1,69 +1,167 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AlertRule, ApiKey, ConsoleState, ConsoleUser, Disk, Instance, InstanceDraft, PublicIp, ResourceGroup, SecurityGroup, Tag, Vpc } from "../domain";
-import { api, ApiError, type ApiUser } from "../api";
+import { api, ApiError, type AdminProviderSyncResource, type ApiInstance, type ApiOrder, type ApiUser, type CloudDisk, type CloudEIP, type CloudSecurityGroup, type CloudSubnet, type CloudVPC } from "../api";
 
-const now = new Date();
-const iso = (days = 0) => new Date(now.getTime() + days * 86400000).toISOString();
 const id = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 6)}`;
-export function allocateHostIp(cidr: string, used: Set<string>, start = 10) { const octets = cidr.split("/")[0]?.split(".") ?? []; const prefix = octets.length === 4 ? octets.slice(0, 3).join(".") : "10.20.1"; for (let host = start; host <= 254; host++) { const address = `${prefix}.${host}`; if (!used.has(address)) { used.add(address); return address; } } throw new Error(`网段 ${cidr} 没有可分配的 IP 地址`); }
 
 const seed: ConsoleState = {
-  version: 4, selectedRegion: "中国重庆二期", balance: 12680.5,
-  instances: [
-    { id: "ins-cq-a100-001", name: "ai-inference-prod-01", status: "running", region: "重庆二期", zone: "可用区 A", cpu: 16, memory: 64, gpu: "NVIDIA A100 40GB", image: "Ubuntu 22.04 LTS", vpcId: "vpc-prod", subnetId: "subnet-prod-a", privateIp: "10.20.1.12", publicIp: "103.91.209.18", bandwidth: 100, billing: "monthly", price: 5680, autoRenew: true, systemDisk: 100, dataDisks: ["disk-data-001"], securityGroupIds: ["sg-web"], resourceGroupId: "rg-prod", createdAt: iso(-38), expiresAt: iso(22) },
-    { id: "ins-cq-cpu-002", name: "data-worker-02", status: "stopped", region: "重庆二期", zone: "可用区 B", cpu: 8, memory: 32, gpu: "无", image: "Rocky Linux 9.4", vpcId: "vpc-dev", subnetId: "subnet-dev-b", privateIp: "10.30.2.24", publicIp: "未绑定", bandwidth: 0, billing: "hourly", price: 3.2, autoRenew: false, systemDisk: 80, dataDisks: [], securityGroupIds: ["sg-internal"], resourceGroupId: "rg-dev", createdAt: iso(-12) },
-  ],
-  orders: [
-    { id: "ord-20260816-0018", instanceId: "ins-cq-a100-001", resourceName: "ai-inference-prod-01", type: "purchase", status: "successful", amount: 5680, createdAt: iso(-38), paidAt: iso(-38) },
-    { id: "ord-20260804-0012", instanceId: "ins-cq-cpu-002", resourceName: "data-worker-02", type: "purchase", status: "successful", amount: 76.8, createdAt: iso(-12), paidAt: iso(-12) },
-  ],
-  vpcs: [
-    { id: "vpc-prod", name: "生产网络", cidr: "10.20.0.0/16", region: "重庆二期", status: "available", createdAt: iso(-180) },
-    { id: "vpc-dev", name: "研发网络", cidr: "10.30.0.0/16", region: "重庆二期", status: "available", createdAt: iso(-96) },
-  ],
-  subnets: [
-    { id: "subnet-prod-a", name: "生产子网 A", vpcId: "vpc-prod", cidr: "10.20.1.0/24", zone: "可用区 A", availableIps: 241 },
-    { id: "subnet-dev-b", name: "研发子网 B", vpcId: "vpc-dev", cidr: "10.30.2.0/24", zone: "可用区 B", availableIps: 246 },
-  ],
-  securityGroups: [
-    { id: "sg-web", name: "Web 服务安全组", vpcId: "vpc-prod", description: "生产 Web 入口规则", rules: [{ id: "rule-https", direction: "in", protocol: "TCP", port: "443", source: "0.0.0.0/0", policy: "allow" }] },
-    { id: "sg-internal", name: "内部服务安全组", vpcId: "vpc-dev", description: "研发环境内部访问", rules: [{ id: "rule-internal", direction: "in", protocol: "ALL", port: "全部", source: "10.30.0.0/16", policy: "allow" }] },
-  ],
-  disks: [{ id: "disk-data-001", name: "模型数据盘", size: 500, type: "ESSD", status: "in-use", instanceId: "ins-cq-a100-001", createdAt: iso(-38) }],
-  resourceGroups: [
-    { id: "rg-default", name: "默认资源组", description: "未分类资源", owner: "admin", createdAt: iso(-220) },
-    { id: "rg-prod", name: "生产环境", description: "线上业务资源", owner: "admin", createdAt: iso(-180) },
-    { id: "rg-dev", name: "研发环境", description: "开发和测试资源", owner: "li.ming", createdAt: iso(-96) },
-  ],
-  tags: [{ id: "tag-env-prod", key: "environment", value: "production", resourceCount: 3 }, { id: "tag-team-ai", key: "team", value: "ai-platform", resourceCount: 2 }],
-  users: [
-    { id: "usr-root", name: "admin", email: "admin@hexbit.local", role: "所有者", scope: "全部资源", status: "active", createdAt: iso(-365) },
-    { id: "usr-ops", name: "李明", email: "li.ming@hexbit.local", role: "运维人员", scope: "生产环境", status: "active", createdAt: iso(-90) },
-  ],
-  apiKeys: [{ id: "key-demo", name: "Terraform 自动化", accessKey: "HBK8F2M9Q4X1", secretHint: "****7wQe", status: "active", createdAt: iso(-60), lastUsedAt: iso(-1) }],
-  alertRules: [
-    { id: "alert-cpu", name: "生产实例 CPU 过高", metric: "CPU", threshold: 85, duration: 5, enabled: true, severity: "警告", resource: "ai-inference-prod-01" },
-    { id: "alert-disk", name: "系统盘使用率", metric: "磁盘", threshold: 90, duration: 10, enabled: true, severity: "严重", resource: "全部实例" },
-  ],
-  alertEvents: [{ id: "evt-01", ruleName: "生产实例 CPU 过高", resource: "ai-inference-prod-01", severity: "警告", status: "已恢复", occurredAt: iso(-1) }],
-  billing: [
-    { id: "bill-01", type: "consume", product: "云服务器", amount: -5680, createdAt: iso(-38), orderId: "ord-20260816-0018" },
-    { id: "bill-02", type: "consume", product: "云服务器", amount: -76.8, createdAt: iso(-12), orderId: "ord-20260804-0012" },
-    { id: "bill-03", type: "recharge", product: "账户充值", amount: 15000, createdAt: iso(-45) },
-  ],
-  logs: [
-    { id: "log-01", instanceId: "ins-cq-a100-001", action: "启动实例", operator: "admin", result: "成功", createdAt: iso(-2) },
-    { id: "log-02", instanceId: "ins-cq-cpu-002", action: "停止实例", operator: "li.ming", result: "成功", createdAt: iso(-1) },
-  ],
-  publicIps: [{ id: "eip-001", address: "103.91.209.18", bandwidth: 100, status: "bound", instanceId: "ins-cq-a100-001" }, { id: "eip-002", address: "103.91.209.24", bandwidth: 20, status: "available" }],
-  notifications: [
-    { id: "notice-billing", title: "8 月账单已经生成", body: "可前往用量与账单页面查看明细。", read: false, createdAt: iso(0) },
-    { id: "notice-maintenance", title: "重庆二期可用区网络维护完成", body: "网络服务已恢复正常。", read: true, createdAt: iso(-1) },
-  ],
-  authorizations: [{ id: "auth-subscription", resourceId: "subscription-main", userIds: ["usr-root"], updatedAt: iso(-30) }],
-  quotaRequests: [],
-  supportTickets: [],
+  version: 5, selectedRegion: "", balance: 0, instances: [], orders: [], vpcs: [], subnets: [],
+  securityGroups: [], disks: [], resourceGroups: [], tags: [], users: [], apiKeys: [], alertRules: [],
+  alertEvents: [], billing: [], logs: [], publicIps: [], notifications: [], authorizations: [],
+  quotaRequests: [], supportTickets: [],
 };
+
+function mapRemoteInstance(item: ApiInstance): Instance {
+  const status = item.status === "provisioning" ? "creating" : item.status;
+  const cpu = Number(item.spec.match(/(\d+)\s*(?:C|vCPU|核)/i)?.[1] ?? item.spec.match(/^(\d+)/)?.[1] ?? 0);
+  const memory = Number(item.spec.match(/(\d+)\s*(?:G|GiB|GB)/i)?.[1] ?? 0);
+  return {
+    id: item.id, offeringId: item.offering_id, name: item.name, status, region: item.region, zone: item.zone, cpu,
+    memory, gpu: "无", image: item.image, vpcId: item.vpc, subnetId: item.subnet ?? "",
+    privateIp: item.private_ip ?? "", publicIp: item.public_ip ?? "", bandwidth: item.bandwidth ?? 0, bandwidthOut: item.bandwidth_out ?? 0, networkType: item.network_type ?? "", billing: item.billing_mode,
+    price: item.price, autoRenew: item.auto_renew, systemDisk: item.disk_gib, dataDisks: [], securityGroupIds: item.security_group_ids ?? [],
+    resourceGroupId: "", createdAt: item.created_at, expiresAt: item.updated_at,
+    source: item.provider_account_id ? "aliyun-sync" : "tenant",
+    providerResourceId: item.provider_resource_id, providerAccountId: item.provider_account_id,
+  };
+}
+
+function metadataValue(metadata: unknown, key: string): unknown {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  return (metadata as Record<string, unknown>)[key];
+}
+
+function metadataString(metadata: unknown, key: string): string {
+  const value = metadataValue(metadata, key);
+  return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
+function metadataNumber(metadata: unknown, key: string): number {
+  const value = metadataValue(metadata, key);
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeSyncedStatus(status: string): Instance["status"] {
+  const value = status.trim().toLowerCase();
+  if (["running", "stopped", "error", "provisioning"].includes(value)) return value === "provisioning" ? "creating" : value as Instance["status"];
+  if (["starting", "stopping", "rebooting"].includes(value)) return "creating";
+  return "error";
+}
+
+function mapSyncedInstance(item: AdminProviderSyncResource): Instance {
+  const metadata = item.metadata;
+  const chargeType = metadataString(metadata, "charge_type").toLowerCase();
+  const createdAt = metadataString(metadata, "creation_time") || item.first_seen_at;
+  const expiresAt = metadataString(metadata, "expired_time") || undefined;
+  const gpuAmount = metadataNumber(metadata, "gpu_amount");
+  const gpuSpec = metadataString(metadata, "gpu_spec");
+  return {
+    id: item.provider_resource_id,
+    name: item.name || item.provider_resource_id,
+    status: normalizeSyncedStatus(item.status),
+    region: item.region_id,
+    zone: metadataString(metadata, "zone_id"),
+    cpu: metadataNumber(metadata, "vcpu"),
+    memory: metadataNumber(metadata, "memory_gib"),
+    gpu: gpuAmount > 0 ? `${gpuSpec || "GPU"} x${gpuAmount}` : "无",
+    image: metadataString(metadata, "os_name") || metadataString(metadata, "image_id") || "-",
+    vpcId: metadataString(metadata, "vpc_id"),
+    subnetId: metadataString(metadata, "vswitch_id"),
+    privateIp: metadataString(metadata, "private_ip"),
+    publicIp: metadataString(metadata, "public_ip"),
+    bandwidth: metadataNumber(metadata, "public_bandwidth_in_mbps"),
+    bandwidthOut: metadataNumber(metadata, "public_bandwidth_out_mbps"),
+    networkType: metadataString(metadata, "network_type"),
+    billing: chargeType === "prepaid" ? "monthly" : "hourly",
+    price: 0,
+    autoRenew: Boolean(metadataValue(metadata, "auto_renew_enabled")),
+    systemDisk: 0,
+    dataDisks: [],
+    securityGroupIds: Array.isArray(metadataValue(metadata, "security_group_ids")) ? metadataValue(metadata, "security_group_ids") as string[] : [],
+    resourceGroupId: metadataString(metadata, "resource_group_id"),
+    createdAt,
+    expiresAt,
+    source: "aliyun-sync",
+    providerResourceId: item.provider_resource_id,
+    providerAccountId: item.provider_account_id,
+  };
+}
+
+function mergeSyncedInstances(instances: Instance[], synced: AdminProviderSyncResource[]): Instance[] {
+  const known = new Set(instances.flatMap((item) => [item.id, item.providerResourceId ?? ""]));
+  return [...instances, ...synced.filter((item) => item.status.toLowerCase() !== "deleted" && !known.has(item.provider_resource_id)).map(mapSyncedInstance)];
+}
+
+function mapRemoteOrder(item: ApiOrder): Order {
+  return {
+    id: item.id, instanceId: "", resourceName: item.resource_name, type: item.type === "renewal" ? "renewal" : "purchase",
+    status: item.status === "successful" ? "successful" : item.status === "cancelled" ? "cancelled" : "pending",
+    amount: item.final_amount, createdAt: item.created_at, paidAt: item.paid_at ?? undefined,
+  };
+}
+
+function mapCloudVpc(item: CloudVPC): Vpc {
+  return { id: item.id, name: item.name, cidr: item.cidr, region: item.region_id, status: "available", createdAt: "" };
+}
+
+function mapCloudSubnet(item: CloudSubnet): Subnet {
+  return { id: item.id, name: item.name, vpcId: item.vpc_id, region: item.region_id, cidr: item.cidr, zone: item.zone_id, availableIps: item.available_ip };
+}
+
+function mapCloudSecurityGroup(item: CloudSecurityGroup): SecurityGroup {
+  return { id: item.id, name: item.name, vpcId: item.vpc_id, region: item.region_id, description: item.description, rules: [] };
+}
+
+function mapCloudDisk(item: CloudDisk): Disk {
+  return { id: item.id, name: item.name, size: item.size_gib, type: item.category.toLowerCase().includes("essd") ? "ESSD" : "SSD", region: item.region_id, zone: item.zone_id, status: item.instance_id ? "in-use" : "available", instanceId: item.instance_id, createdAt: "" };
+}
+
+function mapCloudEip(item: CloudEIP): PublicIp {
+  const bound = item.status.toLowerCase().includes("inuse") || item.status.toLowerCase().includes("bound");
+  return { id: item.id, address: item.address, region: item.region_id, bandwidth: 0, status: bound ? "bound" : "available" };
+}
+
+function mergeById<T extends { id: string }>(current: T[], incoming: T[]): T[] {
+  const known = new Set(current.map((item) => item.id));
+  return [...current, ...incoming.filter((item) => !known.has(item.id))];
+}
+
+function mapSyncedVpc(item: AdminProviderSyncResource): Vpc {
+  return { id: item.provider_resource_id, name: item.name || item.provider_resource_id, cidr: metadataString(item.metadata, "cidr") || metadataString(item.metadata, "cidr_block"), region: item.region_id, status: "available", createdAt: item.first_seen_at };
+}
+
+function mapSyncedSubnet(item: AdminProviderSyncResource): Subnet {
+  return { id: item.provider_resource_id, name: item.name || item.provider_resource_id, vpcId: metadataString(item.metadata, "vpc_id"), region: item.region_id, cidr: metadataString(item.metadata, "cidr") || metadataString(item.metadata, "cidr_block"), zone: metadataString(item.metadata, "zone_id"), availableIps: metadataNumber(item.metadata, "available_ip") };
+}
+
+function mapSyncedSecurityGroup(item: AdminProviderSyncResource): SecurityGroup {
+  return { id: item.provider_resource_id, name: item.name || item.provider_resource_id, vpcId: metadataString(item.metadata, "vpc_id"), region: item.region_id, description: metadataString(item.metadata, "description"), rules: [] };
+}
+
+function mapSyncedDisk(item: AdminProviderSyncResource): Disk {
+  const category = metadataString(item.metadata, "category").toLowerCase();
+  return { id: item.provider_resource_id, name: item.name || item.provider_resource_id, size: metadataNumber(item.metadata, "size_gib"), type: category.includes("essd") ? "ESSD" : "SSD", region: item.region_id, zone: metadataString(item.metadata, "zone_id"), status: metadataString(item.metadata, "instance_id") ? "in-use" : "available", instanceId: metadataString(item.metadata, "instance_id") || undefined, createdAt: item.first_seen_at };
+}
+
+function mapSyncedEip(item: AdminProviderSyncResource): PublicIp {
+  const address = metadataString(item.metadata, "address") || item.name;
+  const status = item.status.toLowerCase();
+  return { id: item.provider_resource_id, address, region: item.region_id, bandwidth: metadataNumber(item.metadata, "bandwidth"), status: status.includes("inuse") || status.includes("bound") ? "bound" : "available", instanceId: metadataString(item.metadata, "instance_id") || undefined };
+}
+
+async function loadSyncedResources(isAdmin: boolean) {
+  const empty = { vpcs: [] as Vpc[], subnets: [] as Subnet[], securityGroups: [] as SecurityGroup[], disks: [] as Disk[], publicIps: [] as PublicIp[] };
+  if (!isAdmin) return empty;
+  const [vpcs, subnets, securityGroups, disks, eips] = await Promise.all([
+    api.adminSyncResources("", "vpc").catch(() => []),
+    api.adminSyncResources("", "subnet").catch(() => []),
+    api.adminSyncResources("", "security_group").catch(() => []),
+    api.adminSyncResources("", "disk").catch(() => []),
+    api.adminSyncResources("", "eip").catch(() => []),
+  ]);
+  return { vpcs: vpcs.map(mapSyncedVpc), subnets: subnets.map(mapSyncedSubnet), securityGroups: securityGroups.map(mapSyncedSecurityGroup), disks: disks.map(mapSyncedDisk), publicIps: eips.map(mapSyncedEip) };
+}
 
 type Update = (state: ConsoleState) => ConsoleState;
 interface StoreValue { state: ConsoleState; user: ApiUser | null; loading: boolean; ready: boolean; error: string; mutate: (update: Update, message?: string) => Promise<boolean>; reset: () => Promise<boolean>; reload: () => Promise<void>; createInstances: (draft: InstanceDraft) => Promise<Instance[]>; toast: string; clearToast: () => void; }
@@ -83,13 +181,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     stateRef.current = snapshot.state;
     setState(snapshot.state);
   }, []);
-  const upgradeState = useCallback((input: ConsoleState): ConsoleState => ({
+  const upgradeState = useCallback((input: ConsoleState): ConsoleState => input.version === seed.version ? ({
     ...structuredClone(seed), ...input, version: seed.version,
-    notifications: input.notifications ?? structuredClone(seed.notifications),
-    authorizations: input.authorizations ?? structuredClone(seed.authorizations),
+    notifications: input.notifications ?? [], authorizations: input.authorizations ?? [],
     quotaRequests: input.quotaRequests ?? [], supportTickets: input.supportTickets ?? [],
-    selectedRegion: input.selectedRegion ?? seed.selectedRegion,
-  }), []);
+  }) : structuredClone(seed), []);
   const reload = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -98,14 +194,62 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const snapshot = await api.consoleState<ConsoleState>();
         const upgraded = upgradeState(snapshot.state);
-        if (snapshot.state.version !== seed.version || !snapshot.state.notifications || !snapshot.state.authorizations || !snapshot.state.quotaRequests || !snapshot.state.supportTickets) {
-          applySnapshot(await api.saveConsoleState(snapshot.revision, upgraded, `升级控制台数据结构到 v${seed.version}`));
-        } else {
-          applySnapshot({ ...snapshot, state: upgraded });
-        }
+        const [remoteInstances, remoteOrders, wallet, remoteVpcs, remoteEips, remoteDisks, remoteSecurityGroups, syncedInstances] = await Promise.all([
+          api.instances().catch(() => []), api.orders().catch(() => []), api.wallet().catch(() => null),
+          api.cloudVpcs().catch(() => []), api.cloudEips().catch(() => []), api.cloudDisks().catch(() => []), api.cloudSecurityGroups().catch(() => []),
+          profile.role === "admin" ? api.adminSyncResources("", "instance").catch(() => []) : Promise.resolve([] as AdminProviderSyncResource[]),
+        ]);
+        upgraded.instances = mergeSyncedInstances(remoteInstances.map(mapRemoteInstance), syncedInstances);
+        upgraded.orders = remoteOrders.map(mapRemoteOrder);
+        upgraded.vpcs = remoteVpcs.map(mapCloudVpc);
+        upgraded.publicIps = remoteEips.map(mapCloudEip);
+        upgraded.disks = remoteDisks.map(mapCloudDisk);
+        upgraded.securityGroups = remoteSecurityGroups.map(mapCloudSecurityGroup);
+        if (!upgraded.selectedRegion) upgraded.selectedRegion = remoteVpcs[0]?.region_id ?? remoteInstances[0]?.region ?? "";
+        upgraded.subnets = upgraded.subnets.map((item) => ({ ...item, region: item.region || upgraded.vpcs.find((vpc) => vpc.id === item.vpcId)?.region || upgraded.selectedRegion }));
+        upgraded.securityGroups = upgraded.securityGroups.map((item) => ({ ...item, region: item.region || upgraded.vpcs.find((vpc) => vpc.id === item.vpcId)?.region || upgraded.selectedRegion }));
+        upgraded.disks = upgraded.disks.map((item) => ({ ...item, region: item.region || upgraded.selectedRegion }));
+        upgraded.publicIps = upgraded.publicIps.map((item) => ({ ...item, region: item.region || upgraded.selectedRegion }));
+        const remoteSubnets = (await Promise.all(remoteVpcs.map((vpc) => api.cloudSubnets(vpc.id).catch(() => [])))).flat();
+        upgraded.subnets = remoteSubnets.map(mapCloudSubnet);
+        const syncedResources = await loadSyncedResources(profile.role === "admin");
+        upgraded.vpcs = mergeById(upgraded.vpcs, syncedResources.vpcs);
+        upgraded.subnets = mergeById(upgraded.subnets, syncedResources.subnets);
+        upgraded.securityGroups = mergeById(upgraded.securityGroups, syncedResources.securityGroups);
+        upgraded.disks = mergeById(upgraded.disks, syncedResources.disks);
+        upgraded.publicIps = mergeById(upgraded.publicIps, syncedResources.publicIps);
+        if (wallet) upgraded.balance = wallet.balance;
+        const needsSave = snapshot.state.version !== seed.version || JSON.stringify(snapshot.state) !== JSON.stringify(upgraded);
+        if (needsSave) applySnapshot(await api.saveConsoleState(snapshot.revision, upgraded, `同步真实资源数据到控制台 v${seed.version}`));
+        else applySnapshot({ ...snapshot, state: upgraded });
       } catch (requestError) {
         if (!(requestError instanceof ApiError) || requestError.status !== 404) throw requestError;
-        applySnapshot(await api.saveConsoleState(0, structuredClone(seed), "初始化控制台数据"));
+        const [remoteInstances, remoteOrders, wallet, remoteVpcs, remoteEips, remoteDisks, remoteSecurityGroups, syncedInstances] = await Promise.all([
+          api.instances().catch(() => []), api.orders().catch(() => []), api.wallet().catch(() => null),
+          api.cloudVpcs().catch(() => []), api.cloudEips().catch(() => []), api.cloudDisks().catch(() => []), api.cloudSecurityGroups().catch(() => []),
+          profile.role === "admin" ? api.adminSyncResources("", "instance").catch(() => []) : Promise.resolve([] as AdminProviderSyncResource[]),
+        ]);
+        const initial = structuredClone(seed);
+        initial.instances = mergeSyncedInstances(remoteInstances.map(mapRemoteInstance), syncedInstances);
+        initial.orders = remoteOrders.map(mapRemoteOrder);
+        initial.vpcs = remoteVpcs.map(mapCloudVpc);
+        initial.publicIps = remoteEips.map(mapCloudEip);
+        initial.disks = remoteDisks.map(mapCloudDisk);
+        initial.securityGroups = remoteSecurityGroups.map(mapCloudSecurityGroup);
+        initial.selectedRegion = remoteVpcs[0]?.region_id ?? remoteInstances[0]?.region ?? "";
+        initial.subnets = initial.subnets.map((item) => ({ ...item, region: item.region || initial.vpcs.find((vpc) => vpc.id === item.vpcId)?.region || initial.selectedRegion }));
+        initial.securityGroups = initial.securityGroups.map((item) => ({ ...item, region: item.region || initial.vpcs.find((vpc) => vpc.id === item.vpcId)?.region || initial.selectedRegion }));
+        initial.disks = initial.disks.map((item) => ({ ...item, region: item.region || initial.selectedRegion }));
+        initial.publicIps = initial.publicIps.map((item) => ({ ...item, region: item.region || initial.selectedRegion }));
+        initial.subnets = (await Promise.all(remoteVpcs.map((vpc) => api.cloudSubnets(vpc.id).catch(() => [])))).flat().map(mapCloudSubnet);
+        const syncedResources = await loadSyncedResources(profile.role === "admin");
+        initial.vpcs = mergeById(initial.vpcs, syncedResources.vpcs);
+        initial.subnets = mergeById(initial.subnets, syncedResources.subnets);
+        initial.securityGroups = mergeById(initial.securityGroups, syncedResources.securityGroups);
+        initial.disks = mergeById(initial.disks, syncedResources.disks);
+        initial.publicIps = mergeById(initial.publicIps, syncedResources.publicIps);
+        if (wallet) initial.balance = wallet.balance;
+        applySnapshot(await api.saveConsoleState(0, initial, "初始化真实控制台数据"));
       }
       setReady(true);
     } catch (requestError) {
@@ -147,9 +291,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const current = stateRef.current;
-      const subnet = current.subnets.find((item) => item.id === draft.subnetId);
+      if (!draft.offeringId) throw new Error("请选择后台已配置的实例规格");
       const resourceGroupName = current.resourceGroups.find((item) => item.id === draft.resourceGroupId)?.name ?? "default";
-      const offeringId = draft.gpu.includes("A100") ? "cq-a100" : draft.gpu.includes("A10") ? "cq-a10" : draft.cpu >= 8 ? "cq-c8" : "cq-c4";
+      const offeringId = draft.offeringId;
       const remoteInstances = await api.createInstances({
         offering_id: offeringId,
         name: draft.name,
@@ -163,32 +307,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         resource_group: resourceGroupName,
       });
       if (remoteInstances.length !== draft.quantity) throw new Error("后端返回的实例数量与购买数量不一致");
-      const createdAt = new Date().toISOString();
-      const unitPrice = calculatePrice({ ...draft, quantity: 1 });
-      const total = unitPrice * draft.quantity;
-      if (current.balance < total) throw new Error("账户余额不足，请先充值");
-      if (!subnet || subnet.availableIps < draft.quantity) throw new Error("所选子网可用 IP 不足");
-      const usedPrivateIps = new Set(current.instances.map((item) => item.privateIp));
-      const usedPublicIps = new Set(current.publicIps.map((item) => item.address));
-      const resources = Array.from({ length: draft.quantity }, (_, index) => {
-        const remote = remoteInstances[index];
-        const instanceId = remote?.id ?? id("ins");
-        const instanceName = draft.quantity > 1 ? `${draft.name}-${String(index + 1).padStart(2, "0")}` : draft.name;
-        const diskId = draft.dataDisk > 0 ? id("disk") : undefined;
-        const publicIpId = draft.publicIp ? id("eip") : undefined;
-        const publicIpAddress = draft.publicIp ? allocateHostIp("103.91.209.0/24", usedPublicIps, 30) : "未绑定";
-        const privateIp = draft.privateIp && draft.quantity === 1 ? draft.privateIp : allocateHostIp(subnet.cidr, usedPrivateIps, 10);
-        const instance: Instance = { id: instanceId, name: instanceName, status: remote?.status === "stopped" ? "stopped" : "running", region: draft.region, zone: draft.zone, cpu: draft.cpu, memory: draft.memory, gpu: draft.gpu, image: draft.image, vpcId: draft.vpcId, subnetId: draft.subnetId, privateIp: remote?.private_ip ?? privateIp, publicIp: remote?.public_ip ?? publicIpAddress, bandwidth: draft.publicIp ? draft.bandwidth : 0, billing: draft.billing, price: remote?.price ?? unitPrice, autoRenew: draft.autoRenew, systemDisk: draft.systemDisk, dataDisks: diskId ? [diskId] : [], securityGroupIds: draft.securityGroupIds, resourceGroupId: draft.resourceGroupId, createdAt, expiresAt: draft.billing === "monthly" ? new Date(Date.now() + draft.duration * 30 * 86400000).toISOString() : undefined };
-        const orderId = id("ord");
-        const disk: Disk | undefined = diskId ? { id: diskId, name: `${instanceName}-data-01`, size: draft.dataDisk, type: "ESSD", status: "in-use", instanceId, createdAt } : undefined;
-        const publicIp: PublicIp | undefined = publicIpId ? { id: publicIpId, address: publicIpAddress, bandwidth: draft.bandwidth, status: "bound", instanceId } : undefined;
-        return { instance, disk, publicIp, order: { id: orderId, instanceId, resourceName: instanceName, type: "purchase" as const, status: "successful" as const, amount: unitPrice, createdAt, paidAt: createdAt }, billing: { id: id("bill"), type: "consume" as const, product: "云服务器", amount: -unitPrice, createdAt, orderId }, log: { id: id("log"), instanceId, action: "创建实例", operator: "admin", result: "成功" as const, createdAt } };
-      });
-      const created = resources.map((item) => item.instance);
-      const next = { ...current, balance: current.balance - total, instances: [...created, ...current.instances], orders: [...resources.map((item) => item.order), ...current.orders], billing: [...resources.map((item) => item.billing), ...current.billing], logs: [...resources.map((item) => item.log), ...current.logs], disks: [...resources.flatMap((item) => item.disk ? [item.disk] : []), ...current.disks], publicIps: [...resources.flatMap((item) => item.publicIp ? [item.publicIp] : []), ...current.publicIps], subnets: current.subnets.map((item) => item.id === draft.subnetId ? { ...item, availableIps: item.availableIps - created.length } : item) };
-      applySnapshot(await persist(revisionRef.current, next, `创建云服务器 ${draft.name}`));
-      setToast(`已创建 ${created.length} 台云服务器，订单和关联资源已写入数据库`);
-      return created;
+      await reload();
+      setToast(`已创建 ${remoteInstances.length} 台云服务器，订单和资源已从后台刷新`);
+      return remoteInstances.map(mapRemoteInstance);
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status === 409) {
         setToast("数据已在其他页面更新，正在重新加载");
@@ -198,7 +319,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       return [];
     } finally { setLoading(false); }
-  }, [applySnapshot, loading, persist, ready, reload]);
+  }, [loading, ready, reload]);
   const reset = useCallback(() => mutate(() => structuredClone(seed), "数据库数据已恢复为初始状态"), [mutate]);
   const value = useMemo(() => ({ state, user, loading, ready, error, mutate, createInstances, toast, clearToast: () => setToast(""), reset, reload }), [state, user, loading, ready, error, mutate, createInstances, toast, reset, reload]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

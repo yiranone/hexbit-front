@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   UserCog,
   Database,
+  GitBranch,
 } from "lucide-react";
 import { id, useConsoleStore } from "../store";
 import { Confirm, Field, Modal } from "../shared";
@@ -25,6 +26,7 @@ import { AdminAlibabaAccountsPage } from "../features/admin/AdminAlibabaAccounts
 import { AdminUsersPage } from "../features/admin/AdminUsersPage";
 import { AdminAliyunCatalogPage } from "../features/admin/AdminAliyunCatalogPage";
 import { AdminFinancePage } from "../features/admin/AdminFinancePage";
+import { AdminChannelsPage } from "../features/admin/AdminChannelsPage";
 import "../styles/index.css";
 
 const menu = [
@@ -40,7 +42,7 @@ const menu = [
   { to: "/api-keys", label: "API 密钥", icon: KeyRound },
   { to: "/help", label: "帮助中心", icon: HelpCircle },
 ];
-const routeNames: Record<string, string> = { compute: "云服务器", instances: "实例管理", network: "网络与 VPC", storage: "存储管理", resources: "资源中心", monitoring: "云监控", billing: "用量与账单", users: "用户与权限", "api-keys": "API 密钥", help: "帮助中心", admin: "系统管理", "provider-accounts": "阿里云账号", catalog: "云基础数据", finance: "用户资金与订单", new: "创建云服务器" };
+const routeNames: Record<string, string> = { compute: "云服务器", instances: "实例管理", network: "网络与 VPC", storage: "存储管理", resources: "资源中心", monitoring: "云监控", billing: "用量与账单", users: "用户与权限", "api-keys": "API 密钥", help: "帮助中心", admin: "系统管理", "provider-accounts": "阿里云账号", catalog: "云基础数据", finance: "用户资金与订单", channels: "渠道管理", new: "创建云服务器" };
 
 export function ConsoleLayout() {
   const { state, user, toast, reset, ready, error, loading, reload, mutate } = useConsoleStore();
@@ -53,6 +55,7 @@ export function ConsoleLayout() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const availableRegions = [...new Set([...state.instances.map((item) => item.region), ...state.vpcs.map((item) => item.region), ...state.subnets.map((item) => item.region), ...state.securityGroups.map((item) => item.region), ...state.disks.map((item) => item.region), ...state.publicIps.map((item) => item.region)].filter(Boolean))];
   useEffect(() => { const resize = () => { if (window.innerWidth < 960) { setCollapsed(true); setMobileOpen(false); } }; window.addEventListener("resize", resize); return () => window.removeEventListener("resize", resize); }, []);
   const crumbs = location.pathname.split("/").filter(Boolean).map((part) => routeNames[part] ?? part);
   const unread = state.notifications.filter((notice) => !notice.read).length;
@@ -60,7 +63,7 @@ export function ConsoleLayout() {
   return <div className={`console-shell ${collapsed ? "collapsed" : ""}`}>
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       <div className="brand"><img src="/hexbit-mark.svg" alt="" /><strong>HEXBIT</strong><button className="icon-button mobile-close" onClick={() => setMobileOpen(false)} aria-label="关闭导航"><X size={18} /></button></div>
-      <nav>{menu.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === "/"} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)}><Icon size={18} /><span>{label}</span><ChevronRight size={14} /></NavLink>)}{user?.role === "admin" && <><div className="nav-section-title"><ShieldCheck size={15} /><span>系统管理</span></div><NavLink to="/admin/provider-accounts" title={collapsed ? "阿里云账号" : undefined} onClick={() => setMobileOpen(false)}><CloudCog size={18} /><span>阿里云账号</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/users" title={collapsed ? "用户管理" : undefined} onClick={() => setMobileOpen(false)}><UserCog size={18} /><span>用户管理</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/catalog" title={collapsed ? "云基础数据" : undefined} onClick={() => setMobileOpen(false)}><Database size={18} /><span>云基础数据</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/finance" title={collapsed ? "用户资金与订单" : undefined} onClick={() => setMobileOpen(false)}><WalletCards size={18} /><span>用户资金与订单</span><ChevronRight size={14} /></NavLink></>}</nav>
+      <nav>{menu.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === "/"} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)}><Icon size={18} /><span>{label}</span><ChevronRight size={14} /></NavLink>)}{user?.role === "admin" && <><div className="nav-section-title"><ShieldCheck size={15} /><span>系统管理</span></div><NavLink to="/admin/provider-accounts" title={collapsed ? "阿里云账号" : undefined} onClick={() => setMobileOpen(false)}><CloudCog size={18} /><span>阿里云账号</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/users" title={collapsed ? "用户管理" : undefined} onClick={() => setMobileOpen(false)}><UserCog size={18} /><span>用户管理</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/channels" title={collapsed ? "渠道管理" : undefined} onClick={() => setMobileOpen(false)}><GitBranch size={18} /><span>渠道管理</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/catalog" title={collapsed ? "云基础数据" : undefined} onClick={() => setMobileOpen(false)}><Database size={18} /><span>云基础数据</span><ChevronRight size={14} /></NavLink><NavLink to="/admin/finance" title={collapsed ? "用户资金与订单" : undefined} onClick={() => setMobileOpen(false)}><WalletCards size={18} /><span>用户资金与订单</span><ChevronRight size={14} /></NavLink></>}</nav>
       <div className="sidebar-foot"><button onClick={() => setResetOpen(true)}><RefreshCw size={17} /><span>恢复初始数据</span></button></div>
     </aside>
     {mobileOpen && <button className="sidebar-scrim" aria-label="关闭导航" onClick={() => setMobileOpen(false)} />}
@@ -68,7 +71,7 @@ export function ConsoleLayout() {
       <header className="topbar">
         <button className="icon-button desktop-menu" onClick={() => setCollapsed((value) => !value)} aria-label="折叠菜单"><Menu size={19} /></button>
         <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="打开菜单"><Menu size={19} /></button>
-        <div className="popover-wrap"><button className="region-button" onClick={() => setRegionOpen((v) => !v)}><Globe2 size={16} /><span>{state.selectedRegion}</span><ChevronDown size={14} /></button>{regionOpen && <div className="popover region-menu">{["中国重庆二期", "新加坡一区"].map((region) => <button key={region} className={state.selectedRegion === region ? "active" : ""} onClick={async () => { const saved = await mutate((s) => ({ ...s, selectedRegion: region }), `默认区域已切换为 ${region}`); if (saved) setRegionOpen(false); }}>{region} {state.selectedRegion === region && <span>当前</span>}</button>)}</div>}</div>
+        <div className="popover-wrap"><button className="region-button" disabled={availableRegions.length === 0} onClick={() => setRegionOpen((v) => !v)}><Globe2 size={16} /><span>{state.selectedRegion || "未选择区域"}</span><ChevronDown size={14} /></button>{regionOpen && <div className="popover region-menu">{availableRegions.map((region) => <button key={region} className={state.selectedRegion === region ? "active" : ""} onClick={async () => { const saved = await mutate((s) => ({ ...s, selectedRegion: region }), `默认区域已切换为 ${region}`); if (saved) setRegionOpen(false); }}>{region} {state.selectedRegion === region && <span>当前</span>}</button>)}</div>}</div>
         <nav className="top-links"><button onClick={() => navigate("/billing")}>费用</button><button onClick={() => navigate("/resources")}>资源</button><button onClick={() => navigate("/users")}>用户</button><button onClick={() => navigate("/help")}>文档</button></nav>
         <div className="top-actions">
           <button className="wallet-button" onClick={() => setRechargeOpen(true)}><WalletCards size={16} /><span>{state.balance.toLocaleString("zh-CN", { minimumFractionDigits: 2 })} USDT</span></button>
@@ -83,7 +86,7 @@ export function ConsoleLayout() {
         <Route path="/network" element={<NetworkPage />} /><Route path="/storage" element={<StoragePage />} /><Route path="/resources" element={<ResourcesPage />} />
         <Route path="/monitoring" element={<MonitoringPage />} /><Route path="/billing" element={<BillingPage onRecharge={() => setRechargeOpen(true)} />} />
         <Route path="/users" element={<UsersPage />} /><Route path="/api-keys" element={<ApiKeysPage />} /><Route path="/help" element={<HelpPage />} />
-        <Route path="/admin/provider-accounts" element={<AdminAlibabaAccountsPage />} /><Route path="/admin/users" element={<AdminUsersPage />} /><Route path="/admin/catalog" element={<AdminAliyunCatalogPage />} /><Route path="/admin/finance" element={<AdminFinancePage />} />
+        <Route path="/admin/provider-accounts" element={<AdminAlibabaAccountsPage />} /><Route path="/admin/users" element={<AdminUsersPage />} /><Route path="/admin/channels" element={<AdminChannelsPage />} /><Route path="/admin/catalog" element={<AdminAliyunCatalogPage />} /><Route path="/admin/finance" element={<AdminFinancePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></main>
     </div>

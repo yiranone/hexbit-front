@@ -63,8 +63,17 @@ export type ApiInstance = {
   duration_months?: number;
   auto_renew: boolean;
   vpc: string;
+  subnet?: string;
+  network_type?: string;
+  bandwidth?: number;
+  bandwidth_out?: number;
+  security_group_ids?: string[];
   created_at: string;
   updated_at: string;
+  provider_name?: string;
+  provider_resource_id?: string;
+  provider_account_id?: string;
+  provider_status?: string;
 };
 
 export type ApiOrder = {
@@ -109,10 +118,10 @@ export type PaidOrder = { order: ApiOrder; instances: ApiInstance[] };
 export type ConsoleSnapshot<T> = { revision: number; state: T; updated_at: string };
 
 export type CloudVPC = { id: string; name: string; region_id: string; cidr: string; status: string };
-export type CloudSubnet = { id: string; vpc_id: string; name: string; zone_id: string; cidr: string; available_ip: number; status: string };
-export type CloudEIP = { id: string; allocation_id: string; address: string; status: string };
+export type CloudSubnet = { id: string; vpc_id: string; region_id: string; name: string; zone_id: string; cidr: string; available_ip: number; status: string };
+export type CloudEIP = { id: string; allocation_id: string; region_id: string; address: string; status: string };
 export type CloudDisk = { id: string; name: string; category: string; size_gib: number; instance_id?: string; region_id: string; zone_id: string; status: string };
-export type CloudSecurityGroup = { id: string; name: string; vpc_id: string; description: string; rule_count: number };
+export type CloudSecurityGroup = { id: string; name: string; vpc_id: string; region_id: string; description: string; rule_count: number };
 export type CloudOperation = { request_id: string };
 export type CloudResourceResult = { id: string; provider_id: string; request_id: string };
 export type CloudResourceMapping = { public_id: string; resource_type: string; provider_name: string; provider_account_id?: string; provider_resource_id: string; region_id: string; status: string };
@@ -124,6 +133,8 @@ export type AdminAlibabaAccount = {
   created_at: string; updated_at: string;
 };
 export type AdminUser = { id: string; email: string; display_name: string; role: string; status: string; created_at: string };
+export type AdminChannel = { id: string; code: string; name: string; description: string; status: string; user_count: number; resource_count: number; created_at: string; updated_at: string };
+export type AdminChannelUser = { user_id: string; email: string; display_name: string; role: string; status: string; created_at: string };
 export type AdminAccountUser = { user_id: string; email: string; display_name: string; role: string; is_default: boolean; created_at: string };
 export type AdminAliyunRegion = { id: string; code: string; name: string; status: string; zone_count: number; created_at: string; updated_at: string };
 export type AdminAliyunZone = { id: string; region_id: string; region_code: string; region_name: string; zone_code: string; name: string; status: string; created_at: string; updated_at: string };
@@ -269,6 +280,13 @@ export const api = {
   createAdminUser: (input: { email: string; password: string; display_name: string; role: "member" | "viewer" }) => request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(input) }),
   updateAdminUser: (id: string, input: { display_name: string; password?: string; role: "member" | "viewer"; status: "active" | "disabled" }) => request<void>(`/admin/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   disableAdminUser: (id: string) => request<void>(`/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminChannels: () => request<AdminChannel[]>("/admin/channels"),
+  createAdminChannel: (input: { code: string; name: string; description: string; status?: string }) => request<AdminChannel>("/admin/channels", { method: "POST", body: JSON.stringify(input) }),
+  updateAdminChannel: (id: string, input: { code: string; name: string; description: string; status: string }) => request<void>(`/admin/channels/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteAdminChannel: (id: string) => request<void>(`/admin/channels/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminChannelUsers: (id: string) => request<AdminChannelUser[]>(`/admin/channels/${encodeURIComponent(id)}/users`),
+  bindAdminChannelUser: (id: string, userId: string) => request<void>(`/admin/channels/${encodeURIComponent(id)}/users`, { method: "POST", body: JSON.stringify({ user_id: userId }) }),
+  unbindAdminChannelUser: (id: string, userId: string) => request<void>(`/admin/channels/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   adminWallets: (query = "") => request<AdminWallet[]>(`/admin/wallets?q=${encodeURIComponent(query)}`),
   adminOrders: (status = "", query = "") => request<AdminOrder[]>(`/admin/orders?status=${encodeURIComponent(status)}&q=${encodeURIComponent(query)}`),
   adminRecharges: (query = "") => request<AdminRecharge[]>(`/admin/recharges?q=${encodeURIComponent(query)}`),
