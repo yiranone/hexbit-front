@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Link2, Plus, RefreshCw, Search, ShieldOff } from "lucide-react";
-import { api, type AdminAccountUser, type AdminAlibabaAccount, type AdminAliyunRegion, type AdminUser, type CloudResourceMapping } from "../../api";
+import { Edit3, History, Link2, Play, Plus, RefreshCw, Search, ShieldOff } from "lucide-react";
+import { api, type AdminAccountUser, type AdminAlibabaAccount, type AdminAliyunRegion, type AdminProviderSyncJob, type AdminProviderSyncRun, type AdminUser, type CloudResourceMapping } from "../../api";
 import { Confirm, EmptyState, Field, Modal, ModalSave, PageHeader, Panel, ResourceTable, StatusBadge, Tabs } from "../../shared";
 
 type AccountForm = { name: string; account_id: string; region_id: string; access_key_id: string; access_key_secret: string; security_token: string; default_image_id: string; default_vswitch_id: string; default_security_group_id: string; status: string };
-const emptyForm: AccountForm = { name: "", account_id: "", region_id: "cn-chongqing", access_key_id: "", access_key_secret: "", security_token: "", default_image_id: "", default_vswitch_id: "", default_security_group_id: "", status: "active" };
+const emptyForm: AccountForm = { name: "", account_id: "", region_id: "", access_key_id: "", access_key_secret: "", security_token: "", default_image_id: "", default_vswitch_id: "", default_security_group_id: "", status: "active" };
+const syncResourceOptions = [["instance", "云服务器"], ["vpc", "VPC"], ["subnet", "子网"], ["eip", "公网 IP"], ["disk", "云盘"], ["security_group", "安全组"], ["mysql", "MySQL 数据库"], ["redis", "Redis 缓存"]] as const;
 
 export function AdminAlibabaAccountsPage() {
   const [accounts, setAccounts] = useState<AdminAlibabaAccount[]>([]);
@@ -15,6 +16,7 @@ export function AdminAlibabaAccountsPage() {
   const [tab, setTab] = useState("账号列表");
   const [edit, setEdit] = useState<AdminAlibabaAccount | "new" | null>(null);
   const [binding, setBinding] = useState<AdminAlibabaAccount | null>(null);
+  const [syncAccount, setSyncAccount] = useState<AdminAlibabaAccount | null>(null);
   const [remove, setRemove] = useState<AdminAlibabaAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -24,15 +26,16 @@ export function AdminAlibabaAccountsPage() {
   return <>
     <PageHeader eyebrow="SYSTEM ADMINISTRATION" title="阿里云账号" description="维护平台统一计费使用的云账号，并将租户资源绑定到指定账号。凭据只写入后台，不会回显。" actions={<><button className="button secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15} />刷新</button><button className="button primary" onClick={() => setEdit("new")}><Plus size={16} />新增账号</button></>} />
     {error && <div className="security-note"><ShieldOff size={18} /><p>{error}</p></div>}
-    <Panel><Tabs items={["账号列表", "资源关联"]} value={tab} onChange={setTab} />{tab === "账号列表" ? <><div className="filters"><label className="search"><Search size={16} /><input placeholder="搜索账号名称、账号 ID 或地域" value={query} onChange={(event) => setQuery(event.target.value)} /></label><button className="button secondary" onClick={() => setQuery("")}>重置</button></div><ResourceTable heads={["账号", "地域", "凭据", "绑定用户", "关联资源", "状态", "操作"]}>{filtered.map((account) => <tr key={account.id}><td><strong>{account.name}</strong><small>{account.id}{account.account_id ? ` · ${account.account_id}` : ""}</small></td><td>{account.region_id}</td><td>{account.has_credentials ? <StatusBadge value="active" /> : <StatusBadge value="error" />}</td><td>{account.bound_user_count}</td><td>{account.resource_count}</td><td><StatusBadge value={account.status} /></td><td><div className="row-actions"><button title="编辑" onClick={() => setEdit(account)}><Edit3 size={15} /></button><button title="绑定用户" onClick={() => setBinding(account)}><Link2 size={15} /></button><button title="停用" disabled={account.status === "disabled"} onClick={() => setRemove(account)}><ShieldOff size={15} /></button></div></td></tr>)}</ResourceTable>{filtered.length === 0 && <EmptyState title={query ? "没有匹配账号" : "暂无阿里云账号"} description="新增账号后即可分配给租户和资源。" />}</> : <ResourceAssociation resources={resources} accounts={accounts} onSaved={load} />}</Panel>
+    <Panel><Tabs items={["账号列表", "资源关联"]} value={tab} onChange={setTab} />{tab === "账号列表" ? <><div className="filters"><label className="search"><Search size={16} /><input placeholder="搜索账号名称、账号 ID 或地域" value={query} onChange={(event) => setQuery(event.target.value)} /></label><button className="button secondary" onClick={() => setQuery("")}>重置</button></div><ResourceTable heads={["账号", "地域", "凭据", "绑定用户", "关联资源", "状态", "操作"]}>{filtered.map((account) => <tr key={account.id}><td><strong>{account.name}</strong><small>{account.id}{account.account_id ? ` · ${account.account_id}` : ""}</small></td><td>{account.region_id}</td><td>{account.has_credentials ? <StatusBadge value="active" /> : <StatusBadge value="error" />}</td><td>{account.bound_user_count}</td><td>{account.resource_count}</td><td><StatusBadge value={account.status} /></td><td><div className="row-actions"><button title="同步设置" disabled={account.status === "disabled"} onClick={() => setSyncAccount(account)}><RefreshCw size={15} /></button><button title="编辑" onClick={() => setEdit(account)}><Edit3 size={15} /></button><button title="绑定用户" onClick={() => setBinding(account)}><Link2 size={15} /></button><button title="停用" disabled={account.status === "disabled"} onClick={() => setRemove(account)}><ShieldOff size={15} /></button></div></td></tr>)}</ResourceTable>{filtered.length === 0 && <EmptyState title={query ? "没有匹配账号" : "暂无阿里云账号"} description="新增账号后即可分配给租户和资源。" />}</> : <ResourceAssociation resources={resources} accounts={accounts} onSaved={load} />}</Panel>
     {edit && <AccountModal value={edit} regions={regions} onClose={() => setEdit(null)} onSaved={async () => { setEdit(null); await load(); }} />}
     {binding && <BindingModal account={binding} users={users} onClose={() => setBinding(null)} onSaved={async () => { setBinding(null); await load(); }} />}
+    {syncAccount && <SyncSettingsModal account={syncAccount} onClose={() => setSyncAccount(null)} onSaved={async () => { await load(); }} />}
     {remove && <Confirm title="停用阿里云账号" message={`停用“${remove.name}”后，新资源不会再使用此账号，已有资源映射仍会保留。`} confirmText="确认停用" onClose={() => setRemove(null)} onConfirm={async () => { await api.disableAdminAlibabaAccount(remove.id); setRemove(null); await load(); }} />}
   </>;
 }
 
 function AccountModal({ value, regions, onClose, onSaved }: { value: AdminAlibabaAccount | "new"; regions: AdminAliyunRegion[]; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [form, setForm] = useState<AccountForm>(() => value === "new" ? emptyForm : {
+  const [form, setForm] = useState<AccountForm>(() => value === "new" ? { ...emptyForm, region_id: regions.find((region) => region.status === "active")?.code ?? "" } : {
     name: value.name, account_id: value.account_id, region_id: value.region_id, access_key_id: value.access_key_id,
     access_key_secret: "", security_token: "", default_image_id: value.default_image_id, default_vswitch_id: value.default_vswitch_id,
     default_security_group_id: value.default_security_group_id, status: value.status,
@@ -42,6 +45,34 @@ function AccountModal({ value, regions, onClose, onSaved }: { value: AdminAlibab
   const catalogRegions = regions.filter((region) => region.status === "active").map((region) => [region.code, region.name] as const);
   const regionValues = catalogRegions.some(([code]) => code === form.region_id) ? catalogRegions : [[form.region_id, "当前账号地域"] as const, ...catalogRegions];
   return <Modal wide title={value === "new" ? "新增阿里云账号" : "编辑阿里云账号"} description="使用 AccessKey 连接阿里云，Endpoint 使用 SDK 默认地址。编辑时 Secret 留空表示保持原值。" onClose={onClose}><div className="form-grid"><Field label="账号名称" required><input value={form.name} onChange={(e) => set("name", e.target.value)} /></Field><Field label="地域 ID" required><select value={form.region_id} onChange={(e) => set("region_id", e.target.value)}>{regionValues.map(([code, name]) => <option key={code} value={code}>{name}（{code}）</option>)}</select></Field><Field label="阿里云账号 ID"><input value={form.account_id} onChange={(e) => set("account_id", e.target.value)} /></Field><Field label="AccessKey ID" required><input value={form.access_key_id} onChange={(e) => set("access_key_id", e.target.value)} /></Field><Field label="AccessKey Secret" required={value === "new"}><input type="password" value={form.access_key_secret} onChange={(e) => set("access_key_secret", e.target.value)} /></Field><Field label="安全令牌（可选）"><input type="password" value={form.security_token} onChange={(e) => set("security_token", e.target.value)} /></Field><Field label="状态"><select value={form.status} onChange={(e) => set("status", e.target.value)}><option value="active">启用</option><option value="disabled">停用</option></select></Field></div>{error && <p className="form-error">{error}</p>}<ModalSave disabled={!form.name.trim() || !form.region_id.trim() || !form.access_key_id.trim() || (value === "new" && !form.access_key_secret.trim())} onClose={onClose} onSave={async () => { try { setError(""); if (value === "new") await api.createAdminAlibabaAccount(form); else await api.updateAdminAlibabaAccount(value.id, form); await onSaved(); } catch (err) { setError(err instanceof Error ? err.message : "保存失败"); } }} /></Modal>;
+}
+
+function SyncSettingsModal({ account, onClose, onSaved }: { account: AdminAlibabaAccount; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [job, setJob] = useState<AdminProviderSyncJob | null>(null);
+  const [form, setForm] = useState({ name: `${account.name}资源同步`, enabled: true, interval_seconds: 3600, resource_types: syncResourceOptions.map(([value]) => value) });
+  const [runs, setRuns] = useState<AdminProviderSyncRun[]>([]); const [error, setError] = useState(""); const [loading, setLoading] = useState(true); const [running, setRunning] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => { void (async () => { try { const jobs = await api.adminSyncJobs(); const current = jobs.find((item) => item.provider_account_id === account.id) ?? null; setJob(current); if (current) setForm({ name: current.name, enabled: current.enabled, interval_seconds: current.interval_seconds, resource_types: current.resource_types }); } catch (err) { setError(err instanceof Error ? err.message : "同步设置加载失败"); } finally { setLoading(false); } })(); }, 0); return () => window.clearTimeout(timer); }, [account.id]);
+  const set = (key: "name" | "enabled" | "interval_seconds" | "resource_types", value: string | boolean | number | string[]) => setForm((current) => ({ ...current, [key]: value }));
+  const toggle = (type: string) => set("resource_types", form.resource_types.includes(type) ? form.resource_types.filter((item) => item !== type) : [...form.resource_types, type]);
+  const save = async () => { const input = { provider_account_id: account.id, ...form }; if (job) await api.updateAdminSyncJob(job.id, input); else { const created = await api.createAdminSyncJob(input); setJob(created); } await onSaved(); onClose(); };
+  const run = async () => {
+    setRunning(true);
+    try {
+      let current = job;
+      const input = { provider_account_id: account.id, ...form };
+      if (current) {
+        await api.updateAdminSyncJob(current.id, input);
+      } else {
+        current = await api.createAdminSyncJob(input);
+        setJob(current);
+      }
+      await api.runAdminSyncJob(current.id);
+      setRuns(await api.adminSyncRuns(current.id));
+      await onSaved();
+    } catch (err) { setError(err instanceof Error ? err.message : "同步提交失败"); } finally { setRunning(false); }
+  };
+  const loadRuns = async () => { if (job) setRuns(await api.adminSyncRuns(job.id)); };
+  return <Modal wide title={`同步设置 · ${account.name}`} description="为当前阿里云账号配置定时同步。同步只读取云资源，不会修改阿里云资源。" onClose={onClose}><div className="form-grid"><Field label="任务名称" required><input value={form.name} onChange={(event) => set("name", event.target.value)} /></Field><Field label="执行周期" required><select value={form.interval_seconds} onChange={(event) => set("interval_seconds", Number(event.target.value))}><option value={300}>每 5 分钟</option><option value={900}>每 15 分钟</option><option value={3600}>每小时</option><option value={21600}>每 6 小时</option><option value={86400}>每天</option></select></Field><label className="check-row"><input type="checkbox" checked={form.enabled} onChange={(event) => set("enabled", event.target.checked)} /><span>启用定时同步</span></label></div><Field label="同步资源类型" required><div className="check-grid">{syncResourceOptions.map(([type, label]) => <label className="check-row" key={type}><input type="checkbox" checked={form.resource_types.includes(type)} onChange={() => toggle(type)} /><span>{label}</span></label>)}</div></Field>{error && <p className="form-error">{error}</p>}<div className="modal-actions"><button className="button secondary" disabled={loading || running || !form.name.trim() || form.resource_types.length === 0} onClick={() => void run()}><Play size={15} />{running ? "同步中..." : "立即同步"}</button><button className="button secondary" disabled={loading || !job} onClick={() => void loadRuns()}><History size={15} />查看记录</button></div>{runs.length > 0 && <div className="simple-list">{runs.slice(0, 5).map((item) => <div key={item.id}><span><b>{item.trigger_type === "manual" ? "手动同步" : "定时同步"}</b><small>{item.status} · {item.synced_count} 条资源</small></span><small>{item.error_message || item.created_at}</small></div>)}</div>}<ModalSave disabled={loading || !form.name.trim() || form.resource_types.length === 0} onClose={onClose} onSave={async () => { try { setError(""); await save(); } catch (err) { setError(err instanceof Error ? err.message : "保存失败"); } }} /></Modal>;
 }
 
 function BindingModal({ account, users, onClose, onSaved }: { account: AdminAlibabaAccount; users: AdminUser[]; onClose: () => void; onSaved: () => Promise<void> }) {

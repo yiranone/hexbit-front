@@ -130,6 +130,9 @@ export type AdminAliyunZone = { id: string; region_id: string; region_code: stri
 export type AdminWallet = { user_id: string; email: string; display_name: string; currency: string; balance: number; version: number; updated_at: string };
 export type AdminOrder = { order: ApiOrder; user_id: string; email: string; display_name: string };
 export type AdminRecharge = { id: string; user_id: string; email: string; display_name: string; kind: string; amount: number; balance_after: number; description: string; created_at: string };
+export type AdminProviderSyncJob = { id: string; provider_account_id: string; provider_account_name: string; name: string; enabled: boolean; interval_seconds: number; resource_types: string[]; last_run_at?: string; next_run_at?: string; last_status: string; last_error?: string; last_synced_count: number; created_at: string; updated_at: string };
+export type AdminProviderSyncRun = { id: string; job_id: string; trigger_type: string; status: string; started_at?: string; finished_at?: string; synced_count: number; error_message?: string; created_at: string };
+export type AdminProviderSyncResource = { provider_account_id: string; provider_account_name: string; resource_type: string; provider_resource_id: string; region_id: string; name: string; status: string; metadata?: unknown; first_seen_at: string; last_seen_at: string };
 
 type ApiEnvelope<T> = { data: T };
 type AuthResult = { access_token: string; token_type: string; expires_in: number; user: ApiUser };
@@ -286,4 +289,11 @@ export const api = {
   unbindAdminAccountUser: (id: string, userId: string) => request<void>(`/admin/provider-accounts/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`, { method: "DELETE" }),
   adminProviderResources: (type = "") => request<CloudResourceMapping[]>(`/admin/provider-resources?type=${encodeURIComponent(type)}`),
   associateAdminResource: (resourceType: string, resourceId: string, accountId: string) => request<void>(`/admin/provider-resources/${encodeURIComponent(resourceType)}/${encodeURIComponent(resourceId)}/associate`, { method: "POST", body: JSON.stringify({ account_id: accountId }) }),
+  adminSyncJobs: () => request<AdminProviderSyncJob[]>('/admin/sync/jobs'),
+  createAdminSyncJob: (input: { provider_account_id: string; name: string; enabled: boolean; interval_seconds: number; resource_types: string[] }) => request<AdminProviderSyncJob>('/admin/sync/jobs', { method: 'POST', body: JSON.stringify(input) }),
+  updateAdminSyncJob: (id: string, input: { provider_account_id: string; name: string; enabled: boolean; interval_seconds: number; resource_types: string[] }) => request<void>(`/admin/sync/jobs/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  disableAdminSyncJob: (id: string) => request<void>(`/admin/sync/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  runAdminSyncJob: (id: string) => request<AdminProviderSyncRun>(`/admin/sync/jobs/${encodeURIComponent(id)}/run`, { method: 'POST' }),
+  adminSyncRuns: (id: string) => request<AdminProviderSyncRun[]>(`/admin/sync/jobs/${encodeURIComponent(id)}/runs`),
+  adminSyncResources: (accountId = '', resourceType = '') => request<AdminProviderSyncResource[]>(`/admin/sync/resources?account_id=${encodeURIComponent(accountId)}&type=${encodeURIComponent(resourceType)}`),
 };

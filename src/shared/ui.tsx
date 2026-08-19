@@ -18,7 +18,7 @@ export function EmptyState({ title = "暂无数据", description = "当前条件
 export function StatusBadge({ value }: { value: string }) {
   const success = ["running", "active", "successful", "available", "open", "approved", "已恢复", "成功", "in-use", "bound"].includes(value);
   const warn = ["creating", "pending", "paused", "stopped", "closed", "警告"].includes(value);
-  const label: Record<string, string> = { running: "运行中", stopped: "已停止", creating: "创建中", error: "异常", active: "正常", disabled: "已禁用", successful: "交易成功", pending: "处理中", approved: "已通过", rejected: "已拒绝", open: "处理中", closed: "已关闭", cancelled: "已取消", available: "可用", "in-use": "使用中", bound: "已绑定", paused: "已暂停", revoked: "已撤销" };
+  const label: Record<string, string> = { running: "运行中", stopped: "已停止", creating: "创建中", error: "异常", active: "正常", disabled: "已禁用", successful: "交易成功", pending: "处理中", queued: "排队中", approved: "已通过", rejected: "已拒绝", open: "处理中", closed: "已关闭", cancelled: "已取消", available: "可用", "in-use": "使用中", bound: "已绑定", paused: "已暂停", revoked: "已撤销", never: "未执行", failed: "失败" };
   return <span className={`status ${success ? "success" : warn ? "warning" : "danger"}`}><i />{label[value] ?? value}</span>;
 }
 export function Tabs({ items, value, onChange }: { items: string[]; value: string; onChange: (value: string) => void }) { return <div className="tabs" role="tablist">{items.map((item) => <button key={item} className={item === value ? "active" : ""} onClick={() => onChange(item)}>{item}</button>)}</div>; }
