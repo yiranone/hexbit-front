@@ -67,7 +67,16 @@ function SyncSettingsModal({ account, onClose, onSaved }: { account: AdminAlibab
         setJob(current);
       }
       await api.runAdminSyncJob(current.id);
-      setRuns(await api.adminSyncRuns(current.id));
+      let latestRuns = await api.adminSyncRuns(current.id);
+      setRuns(latestRuns);
+      let finished = latestRuns.find((item) => item.trigger_type === "manual" && item.status === "running");
+      for (let attempt = 0; finished && attempt < 30; attempt += 1) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1000));
+        latestRuns = await api.adminSyncRuns(current.id);
+        setRuns(latestRuns);
+        finished = latestRuns.find((item) => item.trigger_type === "manual" && item.status === "running");
+      }
+      if (finished) setError("同步仍在后台执行，可稍后点击“查看记录”刷新结果。");
       await onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : "同步提交失败"); } finally { setRunning(false); }
   };
